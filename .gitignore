@@ -1,0 +1,254 @@
+# =============================================================================
+# DroneAcharaya — repo-wide ignore rules.
+#
+# Single source of truth for the whole monorepo (backend, frontend, ml,
+# simulation, data). There is deliberately no second .gitignore inside
+# frontend/ — create-next-app's version was folded in here so that all rules
+# live in one place.
+#
+# Note on negations: a rule ending in /** excludes a directory's *contents*
+# but not the directory itself, which is what lets the !… lines below
+# re-include specific files. Excluding the directory outright (e.g.
+# `node_modules/`) makes anything inside it unreachable, and no negation can
+# bring it back.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Secrets and environment
+# Committing a real .env is the single most expensive mistake available in this
+# repo, so the patterns are broad and the *.example templates are re-included
+# explicitly — those are documentation and must stay tracked.
+# -----------------------------------------------------------------------------
+.env
+.env.*
+*.env
+!.env.example
+!.env.*.example
+!*.env.example
+
+# Credentials and key material
+*.pem
+*.key
+*.pfx
+*.p12
+*.keystore
+*.jks
+credentials.json
+service-account*.json
+.aws/
+.netrc
+
+# -----------------------------------------------------------------------------
+# Python (backend/, ml/)
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Packaging / distribution
+build/
+dist/
+sdist/
+wheels/
+*.egg
+*.egg-info/
+.eggs/
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.python-version
+
+# Test, coverage and type-check caches
+.pytest_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+.pyre/
+.ruff_cache/
+.pytype/
+
+# Jupyter / IPython — notebooks are fine to commit, their checkpoints are not
+.ipynb_checkpoints/
+profile_default/
+ipython_config.py
+
+# -----------------------------------------------------------------------------
+# Node / Next.js (frontend/)
+# -----------------------------------------------------------------------------
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Next.js build output
+.next/
+out/
+.vercel
+next-env.d.ts
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Frontend test coverage
+frontend/coverage/
+
+# Package-manager debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+lerna-debug.log*
+
+# ESLint / Prettier caches
+.eslintcache
+.prettiercache
+
+# -----------------------------------------------------------------------------
+# Data (data/)
+# raw/ and processed/ are regenerable from the simulation, so they stay out of
+# git; their READMEs and .gitkeep files are tracked. data/sample_runs/ is NOT
+# ignored — those committed fixtures are what the tests and the demo depend on.
+# -----------------------------------------------------------------------------
+data/raw/**
+data/processed/**
+!data/raw/README.md
+!data/raw/.gitkeep
+!data/processed/README.md
+!data/processed/.gitkeep
+
+# Bulk data formats, wherever they appear outside the tracked sample runs.
+# data/sample_runs/*.csv is re-included below so the fixtures survive.
+*.parquet
+*.feather
+*.h5
+*.hdf5
+*.tfrecord
+!data/sample_runs/**
+
+# -----------------------------------------------------------------------------
+# ML artifacts (ml/artifacts/)
+# Model weights are large binaries; distribute them out of band and keep
+# metadata.json with them (see ml/artifacts/README.md).
+# -----------------------------------------------------------------------------
+ml/artifacts/**
+!ml/artifacts/README.md
+!ml/artifacts/.gitkeep
+
+# Model weight formats, wherever they land
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.pkl
+*.joblib
+*.safetensors
+
+# Experiment tracking / local run output
+mlruns/
+wandb/
+lightning_logs/
+runs/
+.tensorboard/
+
+# -----------------------------------------------------------------------------
+# MATLAB / Simulink (simulation/)
+# The .slx models themselves ARE tracked — only generated and autosave files
+# are ignored.
+# -----------------------------------------------------------------------------
+*.mat
+*.slx.autosave
+*.slx.r20*
+*.mdl.autosave
+*.asv
+*.autosave
+*.slxc
+*.mexa64
+*.mexmaci64
+*.mexw64
+slprj/
+sccprj/
+codegen/
+*_ert_rtw/
+*_grt_rtw/
+*.slxp
+octave-workspace
+
+# -----------------------------------------------------------------------------
+# Containers and infrastructure
+# -----------------------------------------------------------------------------
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+!terraform.tfvars.example
+.docker/
+
+# -----------------------------------------------------------------------------
+# Logs and temporary files
+# -----------------------------------------------------------------------------
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig
+*.rej
+
+# -----------------------------------------------------------------------------
+# OS cruft
+# -----------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+.directory
+.fuse_hidden*
+.nfs*
+
+# -----------------------------------------------------------------------------
+# Editors and IDEs
+# -----------------------------------------------------------------------------
+.idea/
+.vscode/
+!.vscode/extensions.json
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+.spyderproject
+.spyproject
+.ropeproject
+*~
+\#*\#
+.\#*
+
+# -----------------------------------------------------------------------------
+# Always keep directory placeholders
+# -----------------------------------------------------------------------------
+!**/.gitkeep

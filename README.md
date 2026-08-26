@@ -1,0 +1,89 @@
+# DroneAcharaya
+
+**Predictive health monitoring and digital twin for MALE UAV piston engines —
+SIH 2026.**
+
+DroneAcharaya addresses the SIH 2026 problem statement on building a **Digital
+Twin for MALE (Medium Altitude Long Endurance) UAV** propulsion health
+management. A MALE UAV flies long unattended missions where an engine fault that
+goes unnoticed is not a maintenance ticket but a lost airframe, and where there
+is no pilot on board to hear the engine change note. The system pairs a
+physics-based Simulink model of the piston engine — the twin, which generates
+labelled telemetry across mission profiles and injected fault ramps that would
+be impossible to collect from real airframes — with a three-model ML health
+layer: an autoencoder that flags anomalies from nominal-only training, an
+XGBoost classifier that names the fault, and an LSTM that estimates remaining
+useful life. A FastAPI backend serves ingestion, inference, advisory and replay;
+a Next.js dashboard turns those outputs into gauges, trends, alert cards and a
+scrubable run replay, so an operator sees not just *that* something is wrong but
+what it is, how long they have, and what to do about it.
+
+## Structure
+
+| Folder | Purpose |
+| --- | --- |
+| [`backend/`](backend/) | FastAPI service — telemetry [ingestion](backend/app/modules/ingestion/), model [inference](backend/app/modules/inference/), maintenance [advisory](backend/app/modules/advisory/), and run [replay](backend/app/modules/replay/). Python 3.11. |
+| [`frontend/`](frontend/) | Next.js 15 dashboard (App Router, TypeScript, Tailwind) — [live dashboard](frontend/app/dashboard/), [replay](frontend/app/replay/), [reports](frontend/app/reports/). |
+| [`simulation/`](simulation/) | MATLAB/Simulink engine model, run scripts, [calibration](simulation/calibration/) references, and [fault injection](simulation/fault_injection/) definitions. Structure and docs only so far. |
+| [`ml/`](ml/) | [Training](ml/training/) for the three models, shared [feature engineering](ml/features/), [evaluation](ml/evaluation/) protocol, and versioned [artifacts](ml/artifacts/). |
+| [`data/`](data/) | Telemetry [schema](data/schema.md) (the source of truth for column names), immutable [raw](data/raw/) runs, model-ready [processed](data/processed/) datasets, and committed [sample runs](data/sample_runs/). |
+| [`docs/`](docs/) | [PS mapping](docs/ps_mapping.md), [architecture](docs/architecture.md), [methodology](docs/methodology.md), [deployment roadmap](docs/deployment_roadmap.md), and [pitch](docs/pitch/) material. |
+
+## Getting started
+
+**Backend** (Python 3.11):
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload          # http://localhost:8000/health
+pytest                                  # smoke test
+```
+
+**Frontend** (Node 20+):
+
+```bash
+cd frontend
+npm install
+cp .env.local.example .env.local        # points at http://localhost:8000
+npm run dev                             # http://localhost:3000
+```
+
+## CI
+
+Six GitHub Actions workflows in [`.github/workflows/`](.github/workflows/), each
+running on **push** and **pull_request** against `main` and `develop`. They are
+ports of the CodeBuild buildspecs in the `capbot` and `capmobai-frontend`
+repositories, which run the same tool set on AWS CodeBuild with PR-only
+webhooks.
+
+| Workflow | Checks |
+| --- | --- |
+| [`ci-lint.yml`](.github/workflows/ci-lint.yml) | `ruff check`, `ruff format --check`, `mypy` / ESLint, `tsc --noEmit` |
+| [`ci-tests.yml`](.github/workflows/ci-tests.yml) | `pytest` with coverage report |
+| [`ci-build.yml`](.github/workflows/ci-build.yml) | `next build` |
+| [`ci-deps.yml`](.github/workflows/ci-deps.yml) | `pip-audit` / `npm audit --audit-level=critical` |
+| [`ci-secrets.yml`](.github/workflows/ci-secrets.yml) | Gitleaks secret scan over full history |
+| [`ci-semgrep.yml`](.github/workflows/ci-semgrep.yml) | Semgrep SAST (`p/python`, `p/javascript`, `p/typescript`, `p/owasp-top-ten`) |
+
+Tool config lives at the repo root: [`ruff.toml`](ruff.toml),
+[`mypy.ini`](mypy.ini), [`pytest.ini`](pytest.ini).
+[`.github/dependabot.yml`](.github/dependabot.yml) opens weekly update PRs for
+npm, pip and the actions themselves.
+
+Run the same checks locally:
+
+```bash
+pip install ruff mypy pytest-cov
+ruff check . && ruff format --check . && mypy . && pytest
+cd frontend && npm run lint && npm run typecheck && npm run build
+```
+
+
+## Status
+
+Scaffold. Module routes, training scripts and feature functions are stubs;
+`docs/architecture.md`, `docs/methodology.md` and `docs/deployment_roadmap.md`
+are heading skeletons. `data/schema.md`, `ml/evaluation/README.md` and the
+`simulation/` READMEs carry real decisions and are the place to start reading.

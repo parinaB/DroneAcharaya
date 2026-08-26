@@ -1,0 +1,41 @@
+name: CI / Tests
+
+# Ported from capbot/ci/buildspec-ci-tests.yml.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pytest:
+    name: pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      # requirements.txt pulls torch, so the first run on a cold cache is
+      # slow (~3-4 min). The pip cache above absorbs that on subsequent runs;
+      # if it stays painful, split the heavy training deps out of the
+      # backend's runtime requirements rather than pinning down the cache.
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      # pytest.ini at the repo root sets testpaths/pythonpath, so this runs
+      # from the root rather than cd-ing into backend/.
+      - name: Run pytest
+        run: pytest

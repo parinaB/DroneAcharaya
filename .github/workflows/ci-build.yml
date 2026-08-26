@@ -1,0 +1,45 @@
+name: CI / Build
+
+# Ported from capmobai-frontend/ci/buildspec-ci-build.yml. That repo's
+# `npm test` runs the build itself; here there is no frontend test suite
+# yet, so this workflow just proves `next build` succeeds. Add the test
+# step to this job when frontend tests land.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  frontend:
+    name: next build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+        env:
+          # lib/api-client.ts falls back to localhost when this is unset;
+          # set explicitly so a CI build never silently bakes in a default
+          # that differs from what a developer sees locally.
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:8000

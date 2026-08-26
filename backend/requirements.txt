@@ -1,0 +1,17 @@
+# DroneAcharaya backend — target: Python 3.11
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+numpy
+pandas
+scikit-learn
+xgboost
+torch
+shap
+python-multipart
+
+# dev / test
+pytest
+httpx
+pytest-cov
