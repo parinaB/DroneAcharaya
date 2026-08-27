@@ -88,3 +88,4 @@ Scaffold. Module routes, training scripts and feature functions are stubs;
 `docs/architecture.md`, `docs/methodology.md` and `docs/deployment_roadmap.md`
 are heading skeletons. `data/schema.md`, `ml/evaluation/README.md` and the
 `simulation/` READMEs carry real decisions and are the place to start reading.
+test for pr 
