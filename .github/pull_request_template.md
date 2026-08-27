@@ -26,6 +26,3 @@
 - [ ] Documentation
 - [ ] Chore / dependency update
 
-## Related Issues
-
-<!-- Closes #issue_number or link to Linear ticket -->
