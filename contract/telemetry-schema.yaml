@@ -1,0 +1,354 @@
+# =============================================================================
+# TELEMETRY SCHEMA  (FROZEN CONTRACT)
+# =============================================================================
+# The single language spoken by: engine core -> bridge -> digital twin -> AI ->
+# recorder -> dashboard/Unreal. Nothing downstream may invent field names, units,
+# or rates. Changing a field here is a project-wide breaking change.
+#
+# VALUE-STATUS TAGS (fill before locking):
+#   [SET]        value is decided and stable
+#   [TBD-ENG]    Simulink engineer confirms from model
+#   [TBD-VALID]  comes from AE300-class published/literature envelope (see param table)
+#   [TBD-AI]     AI team confirms required rate for detection
+# Units are decided now (they don't depend on unknown numbers). Rates & ranges
+# carry tags where they still depend on someone's decision.
+#
+# CONVENTIONS:
+#   units follow this schema exactly. SI-ish, explicit. No psi/bar mixing later.
+#   per-cylinder fields: 4 cylinders committed -> _c1.._c4
+#   every field carries a quality_flag semantics (see quality_flag_values)
+# =============================================================================
+
+schema_version: "0.1-draft"
+cylinders: 4
+angle_convention: "degrees before TDC positive"     # for injection timing
+timestamp:
+  field: t
+  unit: s
+  type: float64
+  source: bridge          # bridge stamps canonical time; engine emits sim-time too
+  note: "monotonic seconds from mission start; bridge owns canonical timestamp"
+
+quality_flag_values:       # every measured field gets one of these
+  0: OK
+  1: STALE                 # not updated this tick (rate mismatch / hold)
+  2: SIMULATED             # value from sim, not a real sensor (default in prototype)
+  3: SENSOR_FAULT_SUSPECT  # twin/bridge flagged (bias/drift/stuck/dropout)
+  4: MISSING               # dropout; obey missing_value_policy
+
+missing_value_policy_values:
+  hold_last: "reuse previous value, set quality_flag=STALE"
+  nan: "emit NaN, set quality_flag=MISSING"
+  zero: "emit 0 (only where 0 is physically safe/meaningful)"
+
+# -----------------------------------------------------------------------------
+fields:
+
+  # ---- MECHANICAL -----------------------------------------------------------
+  - name: rpm
+    data_type: float32
+    unit: rpm
+    sample_rate_hz: 50            # [SET]
+    source: engine_model.crankshaft
+    valid_range: [0, 3500]        # [TBD-VALID] confirm redline from envelope
+    missing_value_policy: hold_last
+  - name: torque
+    data_type: float32
+    unit: N_m
+    sample_rate_hz: 50            # [SET]
+    source: engine_model.crankshaft
+    valid_range: [0, TBD]         # [TBD-VALID]
+    missing_value_policy: hold_last
+  - name: power
+    data_type: float32
+    unit: kW
+    sample_rate_hz: 50            # [SET]
+    source: derived              # P = torque * omega ; NOT a sensor
+    valid_range: [0, 170]         # [TBD-VALID] ~200hp class upper bound
+    missing_value_policy: hold_last
+    derived_from: [torque, rpm]
+  - name: engine_load
+    data_type: float32
+    unit: fraction               # 0..1
+    sample_rate_hz: 50            # [SET]
+    source: engine_model
+    valid_range: [0, 1]
+    missing_value_policy: hold_last
+
+  # ---- THERMAL: per-cylinder CHT & EGT --------------------------------------
+  - name: cht_c1
+    data_type: float32
+    unit: degC
+    sample_rate_hz: 10            # [SET]
+    source: engine_model.thermal
+    valid_range: [-40, 260]       # [TBD-VALID] max CHT limit from envelope
+    missing_value_policy: hold_last
+  - name: cht_c2
+    { like: cht_c1 }              # NOTE: expand on lock; shorthand for draft only
+  - name: cht_c3
+    { like: cht_c1 }
+  - name: cht_c4
+    { like: cht_c1 }
+  - name: egt_c1
+    data_type: float32
+    unit: degC
+    sample_rate_hz: 10            # [SET]
+    source: engine_model.thermal
+    valid_range: [0, 1000]        # [TBD-VALID] max EGT limit from envelope
+    missing_value_policy: hold_last
+  - name: egt_c2
+    { like: egt_c1 }
+  - name: egt_c3
+    { like: egt_c1 }
+  - name: egt_c4
+    { like: egt_c1 }
+
+  # ---- LUBRICATION ------------------------------------------------------------
+  - name: oil_pressure
+    data_type: float32
+    unit: bar
+    sample_rate_hz: 10            # [SET]
+    source: engine_model.lubrication
+    valid_range: [0, 10]          # [TBD-VALID]
+    missing_value_policy: hold_last
+  - name: oil_temperature
+    data_type: float32
+    unit: degC
+    sample_rate_hz: 10            # [SET]
+    source: engine_model.lubrication
+    valid_range: [-40, 160]       # [TBD-VALID]
+    missing_value_policy: hold_last
+
+  # ---- FUEL / INJECTION -------------------------------------------------------
+  - name: fuel_flow
+    data_type: float32
+    unit: kg_per_h
+    sample_rate_hz: 10            # [SET]
+    source: engine_model.fuel
+    valid_range: [0, TBD]         # [TBD-VALID]
+    missing_value_policy: hold_last
+  - name: fuel_quantity_used
+    data_type: float32
+    unit: kg
+    sample_rate_hz: 1             # [SET]
+    source: derived              # integral of fuel_flow
+    valid_range: [0, TBD]
+    missing_value_policy: hold_last
+    derived_from: [fuel_flow]
+  - name: fuel_remaining
+    data_type: float32
+    unit: kg
+    sample_rate_hz: 1             # [SET]
+    source: derived              # initial - used
+    valid_range: [0, TBD]
+    missing_value_policy: hold_last
+    derived_from: [fuel_quantity_used]
+  - name: rail_pressure
+    data_type: float32
+    unit: bar
+    sample_rate_hz: 10            # [SET]
+    source: engine_model.fuel
+    valid_range: [0, 2000]        # [TBD-ENG] CRDI rail class
+    missing_value_policy: hold_last
+  - name: injection_timing
+    data_type: float32
+    unit: deg_BTDC
+    sample_rate_hz: 10            # [SET]
+    source: engine_model.fuel
+    valid_range: [-10, 30]        # [TBD-ENG]
+    missing_value_policy: hold_last
+  - name: injection_duration
+    data_type: float32
+    unit: ms
+    sample_rate_hz: 10            # [SET]
+    source: engine_model.fuel
+    valid_range: [0, TBD]         # [TBD-ENG]
+    missing_value_policy: hold_last
+
+  # ---- AIR / TURBO -------------------------------------------------------------
+  - name: boost_pressure
+    data_type: float32
+    unit: bar                     # gauge, above ambient
+    sample_rate_hz: 20            # [SET]
+    source: engine_model.turbo
+    valid_range: [0, 2.5]         # [TBD-VALID]
+    missing_value_policy: hold_last
+  - name: map                     # manifold absolute pressure
+    data_type: float32
+    unit: kPa
+    sample_rate_hz: 20            # [SET]
+    source: engine_model.intake
+    valid_range: [0, 350]         # [TBD-ENG]
+    missing_value_policy: hold_last
+  - name: intake_temperature
+    data_type: float32
+    unit: degC
+    sample_rate_hz: 10            # [SET]
+    source: engine_model.intake
+    valid_range: [-40, 200]       # [TBD-ENG]
+    missing_value_policy: hold_last
+  - name: air_mass_flow
+    data_type: float32
+    unit: kg_per_s
+    sample_rate_hz: 20            # [SET]
+    source: engine_model.intake
+    valid_range: [0, TBD]         # [TBD-ENG]
+    missing_value_policy: hold_last
+  - name: turbo_speed
+    data_type: float32
+    unit: rpm
+    sample_rate_hz: 20            # [SET]
+    source: engine_model.turbo
+    valid_range: [0, TBD]         # [TBD-ENG] optional if practical
+    missing_value_policy: hold_last
+    optional: true
+
+  # ---- COOLING ------------------------------------------------------------------
+  - name: coolant_temperature
+    data_type: float32
+    unit: degC
+    sample_rate_hz: 10            # [SET]
+    source: engine_model.cooling
+    valid_range: [-40, 160]       # [TBD-VALID]
+    missing_value_policy: hold_last
+
+  # ---- VIBRATION (see note) -----------------------------------------------------
+  # Raw tri-axial vibration at kHz CANNOT ride the telemetry contract as a raw
+  # waveform (bandwidth). Contract carries REDUCED FEATURES per axis, computed
+  # onboard/in the sidecar. Raw waveform (if ever needed) is a separate blob
+  # channel, not part of this schema. This resolves the CAN-vs-vibration
+  # contradiction flagged in the PS dissection.
+  - name: vibration_rms_x
+    data_type: float32
+    unit: g
+    sample_rate_hz: 10            # [SET] feature rate, NOT signal rate
+    source: sidecar.vibration     # or sensor feature extractor
+    valid_range: [0, TBD]         # [TBD-ENG]
+    missing_value_policy: nan
+    note: "RMS feature; raw kHz signal is out-of-band, not in this schema"
+  - name: vibration_rms_y
+    { like: vibration_rms_x }
+  - name: vibration_rms_z
+    { like: vibration_rms_x }
+  - name: vibration_order_1x     # amplitude at 1x crank order (example feature)
+    data_type: float32
+    unit: g
+    sample_rate_hz: 10            # [SET]
+    source: sidecar.vibration
+    valid_range: [0, TBD]
+    missing_value_policy: nan
+    note: "order-tracked feature set is [TBD-AI]/[TBD-ENG]; 1x/2x/0.5x minimum"
+
+  # ---- ELECTRICAL -----------------------------------------------------------
+  - name: battery_voltage
+    data_type: float32
+    unit: V
+    sample_rate_hz: 5             # [SET]
+    source: engine_model.electrical
+    valid_range: [0, 36]          # [TBD-ENG] system voltage class
+    missing_value_policy: hold_last
+  - name: battery_current
+    data_type: float32
+    unit: A
+    sample_rate_hz: 5             # [SET]
+    source: engine_model.electrical
+    valid_range: [-200, 200]      # [TBD-ENG]
+    missing_value_policy: hold_last
+  - name: alternator_power
+    data_type: float32
+    unit: kW
+    sample_rate_hz: 5             # [SET]
+    source: engine_model.electrical
+    valid_range: [0, TBD]         # [TBD-ENG]
+    missing_value_policy: hold_last
+
+  # ---- ENVIRONMENT (mirrored from environment-schema; twin needs them inline)
+  # These are INPUTS to the engine, echoed into telemetry so the twin/AI see the
+  # exact operating point that produced each row. Canonical source is the
+  # environment service (see environment-schema.yaml) - NOT recomputed here.
+  - name: altitude
+    data_type: float32
+    unit: m
+    sample_rate_hz: 10            # [SET]
+    source: environment_service
+    valid_range: [0, 12000]       # ~40kft ceiling
+    missing_value_policy: hold_last
+  - name: ambient_pressure
+    data_type: float32
+    unit: kPa
+    sample_rate_hz: 10            # [SET]
+    source: environment_service
+    valid_range: [10, 105]
+    missing_value_policy: hold_last
+  - name: ambient_temperature
+    data_type: float32
+    unit: degC
+    sample_rate_hz: 10            # [SET]
+    source: environment_service
+    valid_range: [-70, 60]
+    missing_value_policy: hold_last
+  - name: air_density
+    data_type: float32
+    unit: kg_per_m3
+    sample_rate_hz: 10            # [SET]
+    source: environment_service   # rho = P/(R*T), computed ONCE, shared
+    valid_range: [0.1, 1.5]
+    missing_value_policy: hold_last
+
+  # ---- CONTROLS / STATE -----------------------------------------------------
+  - name: throttle
+    data_type: float32
+    unit: fraction               # 0..1
+    sample_rate_hz: 50            # [SET]
+    source: mission               # from Unreal/mission script via bridge
+    valid_range: [0, 1]
+    missing_value_policy: hold_last
+  - name: load_demand
+    data_type: float32
+    unit: N_m                    # external/prop load torque demand
+    sample_rate_hz: 50            # [SET]
+    source: mission
+    valid_range: [0, TBD]         # [TBD-VALID]
+    missing_value_policy: hold_last
+  - name: engine_state
+    data_type: enum
+    unit: category
+    sample_rate_hz: 10            # [SET]
+    source: engine_model.state
+    enum_values: [OFF, STARTING, IDLE, TAKEOFF, CLIMB, CRUISE,
+                  HIGH_ALTITUDE_CRUISE, LOITER, THROTTLE_TRANSIENT,
+                  DESCENT, SHUTDOWN, FAULT]
+    missing_value_policy: hold_last
+    note: "twin uses this to GATE residual logic: suppress/relax residuals during
+           THROTTLE_TRANSIENT and STARTING; evaluate normally in steady states"
+
+  # ---- PROVENANCE (per-row, added by bridge) --------------------------------
+  - name: engine_id
+    data_type: string
+    unit: id
+    sample_rate_hz: 1             # [SET]
+    source: bridge
+    missing_value_policy: hold_last
+  - name: mission_id
+    data_type: string
+    unit: id
+    sample_rate_hz: 1             # [SET]
+    source: bridge
+    missing_value_policy: hold_last
+  - name: data_origin            # simulated | replay | real_ecu
+    data_type: enum
+    unit: category
+    sample_rate_hz: 1             # [SET]
+    source: bridge
+    enum_values: [SIMULATED, REPLAY, REAL_ECU]
+    missing_value_policy: hold_last
+    note: "the swap-seam marker; lets twin/AI know provenance without changing schema"
+
+# =============================================================================
+# OPEN DECISIONS before this file is LOCKED:
+#   1. resolve all [TBD-VALID] against AE300-class envelope (param table dependency)
+#   2. resolve all [TBD-ENG] with Simulink engineer once subsystems exist
+#   3. AI team confirms [TBD-AI] vibration feature set + any rate bumps
+#   4. expand the { like: ... } shorthand rows to full explicit entries
+#   5. confirm transport framing (CAN signal packing) lives in bridge, not here
+# =============================================================================
