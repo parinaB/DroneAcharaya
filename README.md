@@ -22,6 +22,7 @@ what it is, how long they have, and what to do about it.
 
 | Folder | Purpose |
 | --- | --- |
+| [`contract/`](contract/) | The frozen-in-progress contract every other folder builds against — [telemetry schema](contract/telemetry-schema.yaml), [environment schema](contract/environment-schema.yaml), [parameter source table](contract/parameter-source-table.csv), [failure-mode matrix](contract/failure-mode-matrix.csv), and the [health-parameter registry](contract/health-parameter-registry.md) that keeps the last two in sync. Drafts — see [`contract/README.md`](contract/README.md). |
 | [`backend/`](backend/) | FastAPI service — telemetry [ingestion](backend/app/modules/ingestion/), model [inference](backend/app/modules/inference/), maintenance [advisory](backend/app/modules/advisory/), and run [replay](backend/app/modules/replay/). Python 3.11. |
 | [`frontend/`](frontend/) | Next.js 15 dashboard (App Router, TypeScript, Tailwind) — [live dashboard](frontend/app/dashboard/), [replay](frontend/app/replay/), [reports](frontend/app/reports/). |
 | [`simulation/`](simulation/) | MATLAB/Simulink engine model, run scripts, [calibration](simulation/calibration/) references, and [fault injection](simulation/fault_injection/) definitions. Structure and docs only so far. |
@@ -87,3 +88,4 @@ Scaffold. Module routes, training scripts and feature functions are stubs;
 `docs/architecture.md`, `docs/methodology.md` and `docs/deployment_roadmap.md`
 are heading skeletons. `data/schema.md`, `ml/evaluation/README.md` and the
 `simulation/` READMEs carry real decisions and are the place to start reading.
+test for pr 
