@@ -1,0 +1,111 @@
+# =============================================================================
+# ENVIRONMENT SCHEMA  (FROZEN CONTRACT)
+# =============================================================================
+# Defines the ONE canonical environment/atmosphere service. This service is the
+# single source of ambient_pressure, ambient_temperature, air_density for the
+# WHOLE system. The engine, the twin's expected-model, and Unreal all consume
+# its OUTPUT. Nobody recomputes atmosphere independently — that is the rule that
+# prevents a modelling mismatch masquerading as a fault in the residual.
+#
+# Data flow:
+#   Unreal/mission  --(SCENARIO INPUTS)-->  environment_service  --(OUTPUTS)-->
+#       engine_model, twin_expected_model, telemetry echo
+#
+# Unreal supplies the SCENARIO (where/when/weather). The service does the PHYSICS
+# (ISA + offset -> P, T, rho). Unreal does NOT compute pressure/density itself.
+# =============================================================================
+
+schema_version: "0.1-draft"
+
+# -----------------------------------------------------------------------------
+# INPUTS: what the mission layer (Unreal or a scripted profile) provides
+# -----------------------------------------------------------------------------
+inputs:
+  - name: altitude
+    data_type: float32
+    unit: m
+    valid_range: [0, 12000]
+    source: mission            # Unreal flight state OR scripted profile
+    note: "geometric altitude; service converts via atmosphere model"
+  - name: airspeed
+    data_type: float32
+    unit: m_per_s
+    valid_range: [0, 120]
+    source: mission
+    optional: true             # V1 may not need it until prop/aero model exists
+  - name: weather_scenario
+    data_type: enum
+    unit: category
+    enum_values: [ISA_STANDARD, HOT_DAY, COLD_DAY, CUSTOM]
+    source: mission
+    note: "selects the temperature-offset profile below"
+  - name: isa_temp_offset
+    data_type: float32
+    unit: K
+    valid_range: [-30, 40]
+    source: mission
+    default: 0
+    note: "ISA+dT. HOT_DAY typically +15..+20 (hot-weather mission). Additive to ISA."
+  - name: wind_speed
+    data_type: float32
+    unit: m_per_s
+    valid_range: [0, 60]
+    source: mission
+    optional: true
+  - name: wind_direction
+    data_type: float32
+    unit: deg
+    valid_range: [0, 360]
+    source: mission
+    optional: true
+
+# -----------------------------------------------------------------------------
+# OUTPUTS: the canonical atmosphere. THESE are what everyone consumes.
+# Field names/units MUST match the mirrored environment fields in
+# telemetry-schema.yaml exactly.
+# -----------------------------------------------------------------------------
+outputs:
+  - name: ambient_pressure
+    data_type: float32
+    unit: kPa
+    valid_range: [10, 105]
+    method: "ISA barometric formula from altitude"    # [SET-METHOD]
+  - name: ambient_temperature
+    data_type: float32
+    unit: degC
+    valid_range: [-70, 60]
+    method: "ISA lapse (6.5 K/km troposphere) + isa_temp_offset"   # [SET-METHOD]
+  - name: air_density
+    data_type: float32
+    unit: kg_per_m3
+    valid_range: [0.1, 1.5]
+    method: "rho = P / (R_specific_air * T)  ; R=287.05 J/kg/K"     # [SET-METHOD]
+    derived_from: [ambient_pressure, ambient_temperature]
+
+# -----------------------------------------------------------------------------
+# MODEL CONSTANTS (physics, not tuned; these ARE known — real values)
+# -----------------------------------------------------------------------------
+constants:
+  R_specific_air_J_per_kg_K: 287.05
+  isa_sea_level_pressure_kPa: 101.325
+  isa_sea_level_temp_K: 288.15
+  isa_tropospheric_lapse_K_per_m: 0.0065
+  isa_tropopause_altitude_m: 11000
+
+# -----------------------------------------------------------------------------
+# IMPLEMENTATION RULE
+# -----------------------------------------------------------------------------
+implementation:
+  canonical_owner: environment_service          # one module, one implementation
+  consumers: [engine_model, twin_expected_model, unreal_gcs, telemetry_echo]
+  rule: >
+    Exactly one implementation of the OUTPUT equations exists. If Simulink needs
+    atmosphere internally it must call/replicate THIS service's outputs bit-for-bit,
+    not roll its own. Any divergence between engine-side and twin-side atmosphere
+    corrupts every residual. Verify engine and twin see identical P/T/rho for the
+    same altitude+offset as a standing integration test.
+
+open_decisions:
+  - "confirm altitude type (geometric vs geopotential) — negligible < 12km but state it"
+  - "decide if airspeed/wind enter V1 at all or wait for prop/aero load model"
+  - "above-tropopause branch (>11km) if missions exceed 36kft — AE300 ceiling makes this edge"

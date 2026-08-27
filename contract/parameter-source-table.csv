@@ -1,0 +1,69 @@
+parameter_name,value,unit,source,source_type,confidence,sensitivity,notes
+# =============================================================================
+# PARAMETER SOURCE TABLE
+# source_type: published | literature | calibrated | assumed
+# confidence:  high | medium | low
+# sensitivity: high | medium | low   (how much model output moves with this param)
+# RULE: no value is "real" until source_type != assumed OR it is explicitly a
+#       stated modelling assumption. sensitivity=high + source_type=assumed is a
+#       RED FLAG -> prioritise sourcing/validating that row.
+# Values below are TBD placeholders EXCEPT physics constants. Fill as you source.
+# =============================================================================
+#
+# ---- ENGINE GEOMETRY / RATING (anchor: AE300-class, representative) ----------
+displacement_total,TBD,L,AE300-class published spec,published,TBD,high,~2.0L class; confirm from public spec
+cylinder_count,4,-,design decision,calibrated,high,high,committed 4-cyl inline
+bore,TBD,mm,AE300-class / literature,published,TBD,medium,
+stroke,TBD,mm,AE300-class / literature,published,TBD,medium,
+compression_ratio,TBD,-,AE300-class published spec,published,TBD,high,diesel ~16-18:1; drives combustion/thermal
+rated_power,TBD,kW,AE300-class published spec,published,TBD,high,~125kW/168hp class; PRIMARY validation target
+rated_rpm,TBD,rpm,AE300-class published spec,published,TBD,high,PRIMARY validation target
+max_torque,TBD,N_m,AE300-class published spec,published,TBD,high,validation target
+redline_rpm,TBD,rpm,AE300-class / assumed,assumed,TBD,medium,sets telemetry valid_range for rpm
+#
+# ---- MECHANICAL DYNAMICS -----------------------------------------------------
+crank_inertia_J,TBD,kg_m2,literature / estimated,literature,TBD,high,"J in J*domega/dt=T-Tload; drives transient lag; HIGH sens"
+friction_fmep_coeff,TBD,-,literature (Heywood FMEP corr),literature,TBD,medium,mechanical friction model
+#
+# ---- COMBUSTION --------------------------------------------------------------
+combustion_efficiency_nominal,TBD,-,literature,literature,TBD,high,eta_c in Q=eta_c*mdot_f*LHV
+wiebe_a,TBD,-,literature (diesel default),literature,TBD,medium,heat-release shape (if used)
+wiebe_m,TBD,-,literature (diesel default),literature,TBD,medium,heat-release shape (if used)
+fuel_LHV,42.8,MJ_per_kg,published (Jet-A/diesel),published,high,low,"heavy fuel LHV; well-known, ~42.5-43"
+injection_timing_nominal,TBD,deg_BTDC,AE300-class / assumed,assumed,TBD,high,drives combustion phasing -> EGT
+#
+# ---- TURBO / AIR PATH --------------------------------------------------------
+turbo_boost_map,TBD,table,calibrated to envelope,calibrated,TBD,high,"RPM->boost lookup (V1); HIGH sens; calibrate to power curve"
+turbo_efficiency_nominal,TBD,-,literature,literature,TBD,high,turbo map efficiency
+intercooler_effectiveness,TBD,-,literature / assumed,assumed,TBD,medium,intake temp after intercooler
+volumetric_efficiency_map,TBD,table,calibrated,calibrated,TBD,high,VE(RPM,MAP); drives air mass flow
+intake_manifold_volume,TBD,L,estimated,assumed,TBD,low,filling-emptying dynamics; LOW sens (can assume)
+#
+# ---- THERMAL (the parameters AE300 will NOT publish - literature/estimate) ---
+cht_thermal_mass,TBD,J_per_K,literature (Al head, sized),literature,TBD,high,"C_thermal in dT/dt=(Qin-Qout)/C; HIGH sens; no published value exists"
+cht_heat_transfer_coeff,TBD,W_per_K,literature (Woschni-derived),literature,TBD,high,combustion->head heat path; HIGH sens
+egt_model_coeff,TBD,-,literature,literature,TBD,high,exhaust temp model
+oil_thermal_mass,TBD,J_per_K,literature / estimated,literature,TBD,medium,oil temp lag
+oil_cooler_effectiveness,TBD,-,assumed,assumed,TBD,medium,oil heat rejection
+coolant_thermal_mass,TBD,J_per_K,literature / estimated,literature,TBD,medium,coolant temp dynamics
+cooling_heat_rejection_nominal,TBD,W,calibrated,calibrated,TBD,high,"nominal cooling capacity; cooling_health scales this"
+#
+# ---- LUBRICATION -------------------------------------------------------------
+oil_pressure_nominal,TBD,bar,AE300-class / assumed,assumed,TBD,medium,oil_pump_health scales this
+oil_pump_gain,TBD,bar_per_rpm,estimated,assumed,TBD,medium,pressure vs rpm relationship
+#
+# ---- FUEL SYSTEM -------------------------------------------------------------
+rail_pressure_nominal,TBD,bar,CRDI class / assumed,assumed,TBD,medium,common-rail nominal
+bsfc_cruise,TBD,g_per_kWh,AE300-class published,published,TBD,high,"~200-210 typical diesel; VALIDATION target"
+fuel_tank_capacity,TBD,kg,mission assumption,assumed,TBD,low,sets fuel_remaining init
+#
+# ---- ELECTRICAL --------------------------------------------------------------
+alternator_rated_power,TBD,kW,assumed,assumed,TBD,low,alternator_health scales this
+battery_capacity,TBD,Ah,assumed,assumed,TBD,low,SOC dynamics
+system_voltage,TBD,V,design decision,assumed,TBD,low,14/28V class
+#
+# ---- PHYSICS CONSTANTS (REAL - not TBD, not tuned) ---------------------------
+R_specific_air,287.05,J_per_kg_K,physics,published,high,low,ideal gas
+gamma_air,1.4,-,physics,published,high,low,ratio of specific heats
+cp_air,1005,J_per_kg_K,physics,published,high,low,
+g_gravity,9.80665,m_per_s2,physics,published,high,low,
