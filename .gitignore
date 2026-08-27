@@ -237,6 +237,9 @@ $RECYCLE.BIN/
 .idea/
 .vscode/
 !.vscode/extensions.json
+
+# Claude Code — per-user local overrides, never shared team config
+.claude/settings.local.json
 *.swp
 *.swo
 *.sublime-workspace
