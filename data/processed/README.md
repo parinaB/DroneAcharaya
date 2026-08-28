@@ -1,5 +1,19 @@
 # data/processed/
 
+See [`../README.md`](../README.md) for the full column reference (every
+telemetry/groundtruth field explained, the multi-headed-LSTM head mapping,
+and known limitations). Each batch lives under `<batch_name>/` (e.g.
+`sanity_batch_001/`) with this layout, written directly by
+`simulation/scripts/run_fleet_missions.m`:
+
+```
+<batch_name>/
+  train/telemetry/       <run_id>.csv            validation/telemetry/
+  train/groundtruth/      <run_id>_groundtruth.csv  validation/groundtruth/
+  meta/                  <run_id>.meta.json (both splits together)
+  completed.log, errors.log
+```
+
 Model-ready datasets derived from `../raw/` by
 `ml/features/feature_engineering.py`: windowed, feature-engineered and split.
 
