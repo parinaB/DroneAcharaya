@@ -40,11 +40,30 @@ contract. Short version:
   canonical environment service, then the engine, gated by validation
   (Step 3) before anything downstream is trusted. These four files, plus a
   `health-parameter-registry.md` that keeps the parameter table and failure
-  matrix using the same health-scalar names, are drafted in
-  [`contract/`](contract/) — see [`contract/README.md`](contract/README.md)
-  for what's still open before they lock. Treat `contract/` as the current
-  source of truth for field/parameter/fault names; extend it there first,
-  never invent a name downstream.
+  matrix using the same health-scalar names, plus `ground-truth-schema.yaml`
+  (the simulation-only companion carrying pre-sensor-fault true values and
+  health-parameter trajectories — deliberately kept out of the telemetry
+  schema, which must also describe real ECU data with no ground truth
+  available), are drafted in [`contract/`](contract/) — see
+  [`contract/README.md`](contract/README.md) for what's still open before
+  they lock. Treat `contract/` as the current source of truth for
+  field/parameter/fault names; extend it there first, never invent a name
+  downstream.
+- **Solver mode is dual-config, not one global setting**: batch dataset
+  generation (Step 6) uses a variable-step solver and resamples onto a
+  uniform grid at export; live/bridge-connected runs (Step 7 twin, Step 9
+  bridge, Step 11 Unreal) need fixed-step so the twin's two parallel engine
+  copies stay tick-aligned. Same `.slx`, different `SimulationInput`/configset
+  per use case — see `build_plan.md`'s Step 2 note for the reasoning and the
+  live step-size ballpark.
+- **Simscape/Powertrain Blockset is scoped to exactly the crank-resolved
+  sidecar (Step 5) — nowhere else.** The mean-value core (Step 2) is
+  lumped-parameter Simulink signal-flow throughout, cooling included — do not
+  reach for Simscape's acausal physical-network blocks anywhere in Step 2 just
+  because a subsystem *could* be modeled that way in the abstract (a coolant
+  loop, for instance). `failure-mode-matrix.csv`'s `model_tier` column is the
+  arbiter: `crank_resolved` appears only on `misfire`, `combustion_instability`,
+  and `mechanical_vibration`; everything else is `mean_value`.
 
 ### Two invariants — hold these regardless of what you're working on
 
@@ -67,11 +86,17 @@ silent bug, not a loud one.
 
 ## Current status vs. the plan
 
-Step 0 (the `contract/` files) is drafted — see above. Everything after it
-(`simulation/`, `backend/`, `ml/`, `frontend/`) still predates this plan and
-is simpler than it: `data/schema.md` is an older flat schema with seven fault
-classes vs. `contract/`'s draft with 15, no environment service / bridge /
-crank-resolved sidecar exist yet. See
+Step 0 (the `contract/` files) is drafted — see above, now including the
+ground-truth schema and the resolved solver-mode decision. **Step 2 (the
+Simulink engine core) is where active work starts now** — build subsystem by
+subsystem per `build_plan.md`'s order (air+turbo → CRDI fuel → combustion →
+crankshaft → per-cylinder thermal → cooling → lubrication → electrical),
+targeting the frozen contract's exact field names and the AE300-class
+parameter table, not an ad hoc structure. Everything after Step 2
+(`backend/`, `ml/`, `frontend/`) still predates this plan and is simpler than
+it: `data/schema.md` is an older flat schema with seven fault classes vs.
+`contract/`'s draft with 15, no environment service / bridge / crank-resolved
+sidecar exist yet. See
 [Status vs. this plan](docs/build_plan.md#status-vs-this-plan) in the build
 plan for the full gap list. Don't assume the scaffold already implements the
 plan — check the gap list first.
@@ -222,7 +247,7 @@ everyone else.
 | --- | --- |
 | [`README.md`](README.md) | Project pitch, repo structure, getting started, CI. |
 | [`docs/build_plan.md`](docs/build_plan.md) | The full build plan (this file's source of truth). |
-| [`contract/`](contract/) | Step 0's constitution files — telemetry schema, environment schema, parameter source table, failure-mode matrix, health-parameter registry. Drafts; see `contract/README.md`. |
+| [`contract/`](contract/) | Step 0's constitution files — telemetry schema, environment schema, parameter source table, failure-mode matrix, health-parameter registry, ground-truth schema. Drafts; see `contract/README.md`. |
 | [`docs/ps_mapping.md`](docs/ps_mapping.md) | SIH problem-statement → deliverable traceability (skeleton, TBD). |
 | [`docs/architecture.md`](docs/architecture.md) | System architecture (skeleton, TBD — should be filled from the build plan). |
 | [`docs/methodology.md`](docs/methodology.md) | Modelling methodology (skeleton, TBD — should be filled from the build plan). |

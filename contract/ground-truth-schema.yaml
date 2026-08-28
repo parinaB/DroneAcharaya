@@ -1,0 +1,118 @@
+# =============================================================================
+# GROUND-TRUTH SCHEMA  (SIMULATION-ONLY COMPANION -- NOT part of the operational
+# contract)
+# =============================================================================
+# Companion to telemetry-schema.yaml. telemetry-schema.yaml must stay valid for
+# data_origin: REAL_ECU as well as SIMULATED -- so it can NEVER carry
+# ground-truth fields (a real ECU has no ground truth, only its own, possibly
+# faulty, sensor reading). This file's data exists ONLY when
+# data_origin: SIMULATED.
+#
+# Why a separate file, not extra columns on the telemetry file: keeps the
+# operational telemetry file 100% schema-pure and swappable for real ECU data.
+# Nothing downstream can accidentally leak ground truth into a model's input by
+# forgetting to drop a column, because it was never in that file to begin with.
+#
+# Usage: validation/scoring only. This is what the twin's health estimate and
+# the AI's fault classification are checked AGAINST -- never fed in as a model
+# input. Feeding this to a network input would leak the answer it's supposed to
+# predict.
+# =============================================================================
+
+schema_version: "0.1-draft"
+
+storage:
+  form: "one file per run (e.g. run_00001_groundtruth.parquet), joined to the
+         corresponding telemetry file by join_keys below"
+  join_keys: [run_id, timestamp]
+  note: "timestamp must match telemetry-schema.yaml's `t` field exactly -- same
+         grid, same rate. No independent resampling."
+
+# -----------------------------------------------------------------------------
+# TRUE SIGNAL VALUES: the pre-sensor-fault-corruption value for every telemetry
+# channel that a sensor fault (bias/drift/noise/stuck/dropout, per
+# health-parameter-registry.md) can corrupt. Same data_type/unit/sample_rate_hz
+# as the mirrored telemetry-schema.yaml field -- expand each `like` reference to
+# a full entry on lock, same convention telemetry-schema.yaml itself uses.
+# -----------------------------------------------------------------------------
+true_values:
+  - { name: rpm_true,                 like: "telemetry-schema.yaml#rpm" }
+  - { name: torque_true,              like: "telemetry-schema.yaml#torque" }
+  - { name: cht_c1_true,              like: "telemetry-schema.yaml#cht_c1" }
+  - { name: cht_c2_true,              like: "telemetry-schema.yaml#cht_c2" }
+  - { name: cht_c3_true,              like: "telemetry-schema.yaml#cht_c3" }
+  - { name: cht_c4_true,              like: "telemetry-schema.yaml#cht_c4" }
+  - { name: egt_c1_true,              like: "telemetry-schema.yaml#egt_c1" }
+  - { name: egt_c2_true,              like: "telemetry-schema.yaml#egt_c2" }
+  - { name: egt_c3_true,              like: "telemetry-schema.yaml#egt_c3" }
+  - { name: egt_c4_true,              like: "telemetry-schema.yaml#egt_c4" }
+  - { name: oil_pressure_true,        like: "telemetry-schema.yaml#oil_pressure" }
+  - { name: oil_temperature_true,     like: "telemetry-schema.yaml#oil_temperature" }
+  - { name: fuel_flow_true,           like: "telemetry-schema.yaml#fuel_flow" }
+  - { name: rail_pressure_true,       like: "telemetry-schema.yaml#rail_pressure" }
+  - { name: injection_timing_true,    like: "telemetry-schema.yaml#injection_timing" }
+  - { name: boost_pressure_true,      like: "telemetry-schema.yaml#boost_pressure" }
+  - { name: map_true,                 like: "telemetry-schema.yaml#map" }
+  - { name: intake_temperature_true,  like: "telemetry-schema.yaml#intake_temperature" }
+  - { name: air_mass_flow_true,       like: "telemetry-schema.yaml#air_mass_flow" }
+  - { name: coolant_temperature_true, like: "telemetry-schema.yaml#coolant_temperature" }
+  - { name: vibration_rms_x_true,     like: "telemetry-schema.yaml#vibration_rms_x" }
+  - { name: vibration_rms_y_true,     like: "telemetry-schema.yaml#vibration_rms_y" }
+  - { name: vibration_rms_z_true,     like: "telemetry-schema.yaml#vibration_rms_z" }
+  - { name: vibration_order_1x_true,  like: "telemetry-schema.yaml#vibration_order_1x" }
+  - { name: battery_voltage_true,     like: "telemetry-schema.yaml#battery_voltage" }
+  - { name: battery_current_true,     like: "telemetry-schema.yaml#battery_current" }
+  - { name: alternator_power_true,    like: "telemetry-schema.yaml#alternator_power" }
+
+# -----------------------------------------------------------------------------
+# HEALTH-PARAMETER TRAJECTORIES: time-varying theta, one column per
+# health-parameter-registry.md canonical name -- NOT a single post-hoc severity
+# scalar. Degradation is staged (healthy-hold -> gradual -> accelerated per
+# build_plan.md Step 6), so scoring the twin's inferred health estimate against
+# the true *path* needs the full trajectory, not an endpoint value.
+# -----------------------------------------------------------------------------
+health_parameter_trajectories:
+  - injector_health_c1
+  - injector_health_c2
+  - injector_health_c3
+  - injector_health_c4
+  - cooling_health
+  - oil_pump_health
+  - bearing_health
+  - turbo_efficiency_deg
+  - combustion_stability
+  - injection_timing_deg
+  - fuel_delivery_health
+  - alternator_health
+  - misfire_rate_c1
+  - misfire_rate_c2
+  - misfire_rate_c3
+  - misfire_rate_c4
+  note: "names and 0.0/1.0 meaning are canonical per health-parameter-registry.md
+         -- rename there first, or not at all, never here. misfire_rate is
+         PER-CYLINDER (c1..c4), matching injector_health's own per-cylinder
+         pattern above -- corrected from an earlier single shared
+         'misfire_rate' column once the Step 5 crank-resolved sidecar was
+         actually built with independent per-cylinder Bernoulli draws (a
+         real injector/cylinder-specific fault, same as injector_health)."
+
+# -----------------------------------------------------------------------------
+# SENSOR-FAULT ACTIVITY: which sensor-fault mode, if any, is live on each
+# corruptible channel at this timestamp. Independent of
+# health_parameter_trajectories above by design -- a unit's physical fault mode
+# and its sensor-fault axis are drawn independently (build_plan.md Step 6), so
+# the model doesn't learn a spurious fault-type <-> sensor-fault correlation.
+# -----------------------------------------------------------------------------
+sensor_fault_activity:
+  column_pattern: "sensor_fault_active_<channel_name>"
+  data_type: enum
+  enum_values: [NONE, BIAS, DRIFT, NOISE, STUCK, DROPOUT]
+  applies_to: "every channel listed in true_values above"
+
+open_decisions:
+  - "confirm file format (Parquet vs. HDF5 group inside the same per-trajectory
+     file as telemetry) once simulation/scripts/ export code is written"
+  - "confirm whether sensor_fault_activity needs a per-fault-type severity value
+     too, or NONE/type is sufficient for scoring"
+  - "expand each `like:` reference to a full explicit entry on lock, same as
+     telemetry-schema.yaml's own shorthand convention"
