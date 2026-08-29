@@ -12,6 +12,7 @@ working in `ml/`.
 | [`training/xgboost_classifier/`](training/xgboost_classifier/) | Multi-class fault identification + SHAP explainability. |
 | [`training/lstm_rul/`](training/lstm_rul/) | Remaining-useful-life regression. |
 | [`features/`](features/) | `feature_engineering.py` — the **single** feature builder all three models share. |
+| [`notebooks/`](notebooks/) | Exploratory notebooks only — see the notebooks rule below. |
 | [`evaluation/`](evaluation/) | Held-out validation protocol, metrics, comparison reports. |
 | [`artifacts/`](artifacts/) | Versioned trained-model outputs — **gitignored**, distribute out of band. |
 
@@ -21,6 +22,15 @@ working in `ml/`.
   `ml/features/feature_engineering.py` (spectral / temporal / physics-residual
   families) — training and live inference cannot drift apart. If a model
   needs a new feature, add it there, not as a local one-off.
+- **Notebooks are exploratory only, never a dependency.** `ml/notebooks/`
+  may hold a shared preprocessing notebook while it's still being worked
+  out (e.g. merging telemetry with ground truth, health-column sign flips,
+  RUL labeling, windowing) — that's fine for prototyping across the
+  autoencoder and LSTM. But once that logic is settled, port it into
+  `ml/features/feature_engineering.py` (or a module it imports) so both
+  `training/autoencoder/` and `training/lstm_rul/` call the same code path
+  instead of re-running a notebook. No training script or `ml/` module may
+  import from `ml/notebooks/`.
 - **Split by `run_id`, never by row.** Consecutive telemetry samples are
   near-duplicates; a random row-level split leaks data. Splits are grouped
   by `run_id` and stratified over `(fault_type, severity_band,
