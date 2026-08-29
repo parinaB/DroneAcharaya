@@ -1,4 +1,4 @@
-function fleet = generate_fleet(n_onset_draws, n_seed_replicates)
+function fleet = generate_fleet(n_onset_draws, n_seed_replicates, opts)
 % GENERATE_FLEET  Build the full list of unit specs per build_plan.md Step 6:
 % each unit = one physical fault mode (or healthy) + one onset-time/
 % degradation-rate draw + one assigned mission shape + a manufacturing-
@@ -9,7 +9,7 @@ function fleet = generate_fleet(n_onset_draws, n_seed_replicates)
 % phase durations) are drawn fresh per MISSION, not per unit, by
 % run_fleet_missions.m calling sample_mission_params.m.
 %
-% fleet = generate_fleet(n_onset_draws, n_seed_replicates)
+% fleet = generate_fleet(n_onset_draws, n_seed_replicates, opts)
 %   n_onset_draws      : distinct onset-time/degradation-rate combinations
 %                        per faulted class (default 5, per build_plan.md's
 %                        own "~5 onset/rate draws" budget language).
@@ -20,11 +20,49 @@ function fleet = generate_fleet(n_onset_draws, n_seed_replicates)
 %                        (skipping the onset/rate draw itself, per the
 %                        plan: "healthy units skip the onset/rate draw --
 %                        just the seed replicates").
+%   opts.n_missions_range      (default [20,50], per build_plan.md)
+%   opts.onset_hours_range     (default [20,200]) -- MUST be sized so a
+%                              unit's expected lifetime (n_missions x
+%                              average mission duration) can actually
+%                              reach onset before it runs out of missions.
+%                              Defaults assume the [20,50]-mission budget
+%                              above (missions average roughly 0.5-1h, so
+%                              20-50 missions gives ~15-50h of life -- onset
+%                              up to 200h would never fire for the SHORTER
+%                              end of that range either; see the built-in
+%                              sanity check below, which is exactly the kind
+%                              of mismatch that shipped an entire batch of
+%                              zero-severity "faulted" missions once already
+%                              (docs/build_plan.md's Step 6 log).
+%   opts.gradual_span_range    (default [60,100])
+%   opts.accel_span_range      (default [10,25])
 %
 % Returns a struct array, one row per unit.
 
 if nargin < 1, n_onset_draws = 5; end
 if nargin < 2, n_seed_replicates = 6; end
+if nargin < 3, opts = struct(); end
+if ~isfield(opts,'n_missions_range'),   opts.n_missions_range   = [20,50]; end
+if ~isfield(opts,'onset_hours_range'),  opts.onset_hours_range  = [20,200]; end
+if ~isfield(opts,'gradual_span_range'), opts.gradual_span_range = [60,100]; end
+if ~isfield(opts,'accel_span_range'),   opts.accel_span_range   = [10,25]; end
+
+% Pre-flight sanity check: a unit's SHORTEST possible lifetime (its minimum
+% n_missions draw x the shortest shape's typical mission duration) must be
+% able to reach the LARGEST onset_hours draw, or that combination of units
+% can NEVER show any degradation at all -- exactly the bug that silently
+% produced an all-zero-severity batch once (see build_plan.md's Step 6 log).
+% ~0.25h is hot_day_ground_ops's rough duration, the shortest of the 5 shapes.
+min_lifetime_hours = opts.n_missions_range(1) * 0.25;
+if opts.onset_hours_range(2) > min_lifetime_hours
+    warning('generate_fleet:onsetMayNeverFire', ...
+        ['onset_hours_range max (%.1fh) exceeds the shortest-shape worst-case ' ...
+         'unit lifetime (%.1fh = %d missions x ~0.25h/mission). Units drawing ' ...
+         'both the largest onset AND the smallest n_missions AND the shortest ' ...
+         'mission shape will show zero degradation for their entire life. ' ...
+         'Narrow onset_hours_range or widen n_missions_range/mission-shape mix.'], ...
+        opts.onset_hours_range(2), min_lifetime_hours, opts.n_missions_range(1));
+end
 
 reg = fault_class_registry();
 fault_classes = ['healthy'; reg(:,1)];
@@ -49,9 +87,10 @@ for fc = 1:numel(fault_classes)
             % onset spread across a representative unit lifetime; gradual
             % phase notably longer than the accelerated end-of-life phase
             % (slow creep, then fast failure), per build_plan.md's staging.
-            onset_hours  = 20 + (od-1)/max(n_draws_this_class-1,1) * 180; % 20..200h
-            gradual_span = 60  + 40*rand();   % 60-100h slow phase
-            accel_span   = 10  + 15*rand();   % 10-25h fast end-of-life phase
+            oh = opts.onset_hours_range; gs = opts.gradual_span_range; as = opts.accel_span_range;
+            onset_hours  = oh(1) + (od-1)/max(n_draws_this_class-1,1) * (oh(2)-oh(1));
+            gradual_span = gs(1) + (gs(2)-gs(1))*rand();
+            accel_span   = as(1) + (as(2)-as(1))*rand();
         end
 
         for sr = 1:n_seed_replicates
@@ -67,7 +106,7 @@ for fc = 1:numel(fault_classes)
             u.accel_span_hours = accel_span;
             u.manufacturing_seed = randn(); % small std-normal draw; consumed by
                                               % apply_manufacturing_tolerance.m
-            u.n_missions = randi([20,50]);
+            u.n_missions = randi(opts.n_missions_range);
 
             % Independent sensor-fault draw (per build_plan.md: drawn
             % independently of both physical fault and shape). Only cht_c3
