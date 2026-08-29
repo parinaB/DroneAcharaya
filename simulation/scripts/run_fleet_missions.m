@@ -101,9 +101,9 @@ for ui = 1:numel(fleet)
 
             if ~strcmp(unit.fault_class,'healthy')
                 ridx = find(strcmp(reg(:,1), unit.fault_class));
-                target = reg{ridx,2}; convention = reg{ridx,3}; theta_field = reg{ridx,5};
+                target = reg{ridx,2}; convention = reg{ridx,3}; theta_field = reg{ridx,5}; max_severity = reg{ridx,6};
                 val = compute_health_trajectory(convention, unit.onset_hours, ...
-                    accumulated_hours, unit.gradual_span_hours, unit.accel_span_hours);
+                    accumulated_hours, unit.gradual_span_hours, unit.accel_span_hours, max_severity);
                 if contains(target,'%d')
                     target = sprintf(target, unit.affected_cylinder);
                 end

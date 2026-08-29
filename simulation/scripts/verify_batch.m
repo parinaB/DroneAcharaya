@@ -217,12 +217,27 @@ for i = 1:numel(files)
 end
 
 %% ---- E. batch-level stats -----------------------------------------------
+% no_comparison_classes never accumulate a severity list at all (see the
+% switch above -- cooling_degradation/turbo_degradation push an INFO finding
+% per-mission instead of setting `severity`), so an empty list there is
+% expected, not a bug. For every OTHER faulted class, an all-zero (or
+% otherwise degenerate) severity spread across EVERY mission means onset
+% never fired for a single mission of that class in this whole batch --
+% exactly the bug that shipped an entire mislabeled batch once (see
+% docs/build_plan.md's Step 6 log) -- so that case is a hard FAIL, not an INFO.
+no_comparison_classes = {'healthy','cooling_degradation','turbo_degradation'};
 classes = keys(class_counts);
 for i = 1:numel(classes)
     c = classes{i};
     sevs = class_severities(c);
     if isempty(sevs)
-        findings(end+1,:) = {'INFO', 'BATCH', 'E_class_coverage', sprintf('%s: %d missions, no severity spread (healthy or not applicable)', c, class_counts(c))}; %#ok<AGROW>
+        if ismember(c, no_comparison_classes)
+            findings(end+1,:) = {'INFO', 'BATCH', 'E_class_coverage', sprintf('%s: %d missions, no severity spread (healthy or not applicable)', c, class_counts(c))}; %#ok<AGROW>
+        else
+            findings(end+1,:) = {'FAIL', 'BATCH', 'E_class_coverage', sprintf('%s: %d missions but NO severity values recorded at all -- check the fault_class_registry/theta wiring for this class', c, class_counts(c))}; %#ok<AGROW>
+        end
+    elseif max(sevs) < 0.02 && ~ismember(c, no_comparison_classes)
+        findings(end+1,:) = {'FAIL', 'BATCH', 'E_class_coverage', sprintf('%s: %d missions, severity range [%.2f, %.2f] -- onset never fired for ANY mission of this class; check onset_hours vs. n_missions x mission-duration (see generate_fleet.m)', c, class_counts(c), min(sevs), max(sevs))}; %#ok<AGROW>
     else
         findings(end+1,:) = {'INFO', 'BATCH', 'E_class_coverage', sprintf('%s: %d missions, severity range [%.2f, %.2f]', c, class_counts(c), min(sevs), max(sevs))}; %#ok<AGROW>
     end
