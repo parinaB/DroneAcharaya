@@ -8,7 +8,7 @@ code path serves offline training and online inference.
 import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 import joblib
 import numpy as np
@@ -24,7 +24,7 @@ _GATED_OUT_STATES = {"STARTING", "SHUTDOWN", "THROTTLE_TRANSIENT"}
 
 
 @lru_cache(maxsize=4)
-def _load_digital_twin_models(artifacts_dir: str) -> dict[str, object]:
+def _load_digital_twin_models(artifacts_dir: str) -> dict[str, Any]:
     path = Path(artifacts_dir)
     metadata = json.loads((path / "metadata.json").read_text())
     return {target: joblib.load(path / f"{target}.joblib") for target in metadata["target_channels"]}

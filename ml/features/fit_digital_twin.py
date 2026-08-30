@@ -27,28 +27,56 @@ from sklearn.model_selection import train_test_split
 CONDITION_FEATURES = ["rpm", "throttle", "altitude", "ambient_temperature", "air_density"]
 
 TARGET_CHANNELS = [
-    "torque", "power",
-    "cht_c1", "cht_c2", "cht_c3", "cht_c4",
-    "egt_c1", "egt_c2", "egt_c3", "egt_c4",
-    "oil_pressure", "oil_temperature",
-    "fuel_flow", "rail_pressure", "injection_timing",
-    "boost_pressure", "map", "intake_temperature", "air_mass_flow",
+    "torque",
+    "power",
+    "cht_c1",
+    "cht_c2",
+    "cht_c3",
+    "cht_c4",
+    "egt_c1",
+    "egt_c2",
+    "egt_c3",
+    "egt_c4",
+    "oil_pressure",
+    "oil_temperature",
+    "fuel_flow",
+    "rail_pressure",
+    "injection_timing",
+    "boost_pressure",
+    "map",
+    "intake_temperature",
+    "air_mass_flow",
     "coolant_temperature",
-    "vibration_rms_x", "vibration_order_1x",
-    "vibration_rms_x_bearing_proxy", "vibration_order_1x_bearing_proxy",
-    "battery_voltage", "battery_current", "alternator_power",
+    "vibration_rms_x",
+    "vibration_order_1x",
+    "vibration_rms_x_bearing_proxy",
+    "vibration_order_1x_bearing_proxy",
+    "battery_voltage",
+    "battery_current",
+    "alternator_power",
 ]
 
 GATED_OUT_STATES = {"STARTING", "SHUTDOWN", "THROTTLE_TRANSIENT"}
 
 HEALTHY_KEYS_UNITY = [
-    "injector_health_c1", "injector_health_c2", "injector_health_c3", "injector_health_c4",
-    "cooling_health", "oil_pump_health", "bearing_health", "fuel_delivery_health",
+    "injector_health_c1",
+    "injector_health_c2",
+    "injector_health_c3",
+    "injector_health_c4",
+    "cooling_health",
+    "oil_pump_health",
+    "bearing_health",
+    "fuel_delivery_health",
     "alternator_health",
 ]
 HEALTHY_KEYS_ZERO = [
-    "turbo_efficiency_deg", "combustion_stability", "injection_timing_deg",
-    "misfire_rate_c1", "misfire_rate_c2", "misfire_rate_c3", "misfire_rate_c4",
+    "turbo_efficiency_deg",
+    "combustion_stability",
+    "injection_timing_deg",
+    "misfire_rate_c1",
+    "misfire_rate_c2",
+    "misfire_rate_c3",
+    "misfire_rate_c4",
 ]
 
 
@@ -108,9 +136,7 @@ def main() -> None:
 
     run_ids = _find_healthy_train_runs(data_path)
     print(f"fitting on {len(run_ids)} fully-healthy train-split runs")
-    train_run_ids, eval_run_ids = train_test_split(
-        run_ids, test_size=args.holdout_frac, random_state=args.seed
-    )
+    train_run_ids, eval_run_ids = train_test_split(run_ids, test_size=args.holdout_frac, random_state=args.seed)
 
     train_rows = _load_gated_rows(data_path, train_run_ids)
     eval_rows = _load_gated_rows(data_path, eval_run_ids)
