@@ -260,7 +260,7 @@ everyone else.
 | [`docs/architecture.md`](docs/architecture.md) | System architecture (skeleton, TBD — should be filled from the build plan). |
 | [`docs/methodology.md`](docs/methodology.md) | Modelling methodology (skeleton, TBD — should be filled from the build plan). |
 | [`data/schema.md`](data/schema.md) | Older (pre-`contract/`) flat telemetry schema — what `backend/`/`ml/`/`frontend/` currently actually implement, until `contract/telemetry-schema.yaml` locks and replaces it. |
-| [`simulation/README.md`](simulation/README.md) | Simulink model tree layout (structure only, no `.slx` committed yet). |
+| [`simulation/README.md`](simulation/README.md) | Simulink model tree layout — `model/` and `scripts/` are built and validated (Steps 1-6). |
 
 ## Working conventions
 

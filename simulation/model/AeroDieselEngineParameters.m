@@ -115,6 +115,21 @@ Eng.TurboAltitudeCompHeadroom    = 1.5;     % turbo's max PR as a multiple of it
 % schedules fueling off demand, not off what the turbo manages to deliver.
 Eng.FuelIdleFlow_kg_h = 2.0;   % literature-typical small-diesel idle consumption (~2.5 L/h); avoids the
                                 % BSFC-based term's zero-power singularity (BSFC*power -> 0 at idle otherwise)
+Eng.IdleGovernorKp_kgh_per_rpm = 0.03;  % real diesel ECUs run a closed-loop idle-speed governor on top of
+                                          % the throttle-scheduled fuel map above -- without it, any unit whose
+                                          % manufacturing-tolerance friction draw pushes idle torque balance
+                                          % slightly negative sags below IdleRPM_crank with no correcting term,
+                                          % which (combined with CmpEngineRunning's stall cutoff) is a one-way
+                                          % door to a permanent stall. This trim is proportional to RPM shortfall
+                                          % below idle and fades to zero at/above idle, so cruise/climb/descent
+                                          % fueling (already scheduled off commanded load, see note above) is untouched
+Eng.IdleGovernorMaxTrim_kg_h   = 15.0;  % saturates the trim so a deep/fast RPM sag can't demand implausible fueling
+Eng.AFRSmokeLimit = 16;   % real diesel ECUs cap fueling by available air (a "smoke limiter"), independent of
+                           % the idle-governor trim above -- without it, the trim can demand more fuel than the
+                           % (also RPM-scaled) intake air can support during a fast recovery, crashing AFR into
+                           % single digits and producing a nonphysical EGT spike. Floors total commanded fuel
+                           % so AFR never drops below this value, regardless of load or trim; only binds during
+                           % low-RPM recovery transients since air is abundant everywhere else
 Eng.BSFCMap.RefPower_kW      = [74.1  123.5];    % the two published factsheet test points
 Eng.BSFCMap.BSFC_g_per_kWh   = [178.1 210.5];    % back-solved (not the raw two-point 205/227 g/kWh) so that
                                                    % FuelIdleFlow_kg_h + RefPower*BSFC/1000 reproduces the

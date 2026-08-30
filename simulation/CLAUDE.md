@@ -8,13 +8,13 @@ working in `simulation/`.
 
 | Folder | Holds |
 | --- | --- |
-| [`model/`](model/) | Simulink plant model (`.slx`) — the engine physics itself. |
-| [`scripts/`](scripts/) | MATLAB drivers/export scripts (`.m`) that run the model and write telemetry. |
-| [`fault_injection/`](fault_injection/) | Fault ramp definitions (`.json`/`.m`). |
-| [`calibration/`](calibration/) | Parameter references — where each model constant came from and how it was validated. |
+| [`model/`](model/) | Simulink plant models (`.slx`) — `engine_core`, `crank_resolved_sidecar`, `environment_service` — plus `AeroDieselEngineParameters.m`. |
+| [`scripts/`](scripts/) | MATLAB drivers/export scripts (`.m`) that run the model, inject faults, and write telemetry. |
+| [`fault_injection/`](fault_injection/) | Superseded — fault ramps are `scripts/compute_health_trajectory.m` + `scripts/fault_class_registry.m`, not a separate folder. |
+| [`calibration/`](calibration/) | Superseded — parameter sourcing is in `model/AeroDieselEngineParameters.m`'s comments + `../contract/parameter-source-table.csv`. |
 
-No `.slx`/`.m` files are committed yet — see each subfolder's README for the
-anticipated file layout and entry points.
+`model/` and `scripts/` are built and validated end-to-end — see
+`../docs/build_plan.md`'s Step 6 log for what's been verified and how.
 
 ## Non-negotiables
 
@@ -42,17 +42,18 @@ anticipated file layout and entry points.
 
 ## Commands
 
-From `simulation/scripts/` in MATLAB (anticipated entry points — confirm
-actual filenames once committed):
+From `simulation/scripts/` in MATLAB:
 ```matlab
-run_mission('<mission_profile_id>')     % single run, returns a timetable
-batch_generate('<config>')              % sweep profiles x faults x severities
-export_run(run, '../data/raw/')         % write CSV/Parquet, schema column order
-plot_run(run)                           % quick-look diagnostics
+run_single_mission(...)                 % one-off single mission run
+generate_fleet(...)                      % build a fleet's unit list (fault x onset/rate x seed)
+run_fleet_missions(fleet, out_dir, opts) % orchestration loop -- runs + exports a whole fleet
+verify_batch('data/processed/<batch_name>')  % physical-sanity + fault-signature checks
 ```
+See `generate_short_batch.m` / `generate_main_batch.m` for the actual
+end-to-end call pattern used to produce a batch.
 
 ## Approval gate
 
-No `git commit`/`push`/merge without explicit user confirmation this
-session — same rule as the root [`CLAUDE.md`](../CLAUDE.md), repeated here
-because `.slx` binary diffs are especially easy to push by accident.
+Same rule as the root [`CLAUDE.md`](../CLAUDE.md): no `git commit`/`push`/
+merge without explicit user confirmation — `.slx` binary diffs are
+especially easy to push by accident.
