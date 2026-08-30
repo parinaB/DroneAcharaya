@@ -53,10 +53,22 @@ working in `ml/`.
   needs a `metadata.json` (feature order, hyperparameters, metrics, dataset
   id) alongside the weights — an artifact without it isn't reproducible and
   shouldn't be shared.
+- **`physics_residuals()` is data-driven, not a re-run of `engine_core.slx`.**
+  Step 7's "expected reference" is one regressor per target channel, fit on
+  operating condition (rpm/throttle/altitude/ambient_temperature/air_density)
+  using only fully-healthy missions — see `fit_digital_twin.py`'s docstring
+  for why (matches this function's actual Python-only signature; a live
+  Simulink round-trip per inference call would not). Rows in a genuine
+  transient (`STARTING`/`SHUTDOWN`/`THROTTLE_TRANSIENT`) get NaN residuals by
+  design, not a number — don't fill them in downstream.
 
 ## Commands
 
 ```bash
+# Step 7 -- fit the digital twin's expected-value models (run this first; the
+# three models below all read physics_residuals(), which loads these).
+python ml/features/fit_digital_twin.py --data-path data/processed/main_batch_1000 --output-path ml/artifacts
+
 python -m ml.training.autoencoder.train --data-path data/processed --output-path ml/artifacts
 python -m ml.training.xgboost_classifier.train --data-path data/processed --output-path ml/artifacts
 python -m ml.training.lstm_rul.train --data-path data/processed --output-path ml/artifacts --epochs 50

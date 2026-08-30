@@ -668,6 +668,36 @@ so transients aren't misread as faults. Roadmap note for deployment: a
 UKF/EKF state observer replaces the forward reference model in production —
 not built now, but the stated evolution path.
 
+**Update — the "expected reference" is data-driven, not a live re-run of
+`engine_core.slx`, a deliberate departure from this section's original
+wording.** `ml/features/feature_engineering.py`'s `physics_residuals()`
+stub already committed to a single-DataFrame-in, residual-DataFrame-out
+signature meant to serve identically "offline training and online
+inference" — a live Simulink round-trip per inference call doesn't fit that
+contract, and now that `main_batch_1000` exists there's enough genuinely
+healthy data to fit expected-value relationships directly: 269 missions are
+fully healthy end-to-end (not just the dedicated `healthy` fault class —
+every other fault class's pre-onset missions count too, and dominate the
+269), spread across all 5 mission shapes. `ml/features/fit_digital_twin.py`
+fits one `HistGradientBoostingRegressor` per target channel (24 channels:
+torque/power, per-cylinder CHT/EGT, oil/coolant, fuel system, turbo/intake,
+vibration + bearing proxies, electrical) against operating condition
+(rpm, throttle, altitude, ambient_temperature, air_density), training only
+on the 259 healthy train-split runs and holding out 10 for eval metrics.
+`physics_residuals()` loads these (cached) and gates rows in a genuine
+transient (`STARTING`/`SHUTDOWN`/`THROTTLE_TRANSIENT`) to NaN rather than
+computing a residual against a regime the models were never fit on — the
+state-machine-gating this section already called for.
+
+Verified end-to-end on `UNIT-mechanicalvibration-0052`: `M001` (bearing_health
+= 1.0, fully healthy) gives `vibration_rms_x_bearing_proxy_residual` ≈ 0
+(machine epsilon, no false alarm); `M009` (bearing_health = 0.5, deep into
+onset) gives the same residual at mean 0.152 (range 0.0008–0.204) — the twin
+cleanly discriminates the fault using the exact discriminator Step 6's
+`verify_batch.m` fix established, purely from operating-condition regression,
+no second Simulink instance involved. The UKF/EKF-in-production roadmap note
+above is unaffected by this — still the stated evolution path, not built now.
+
 **Step 8 — AI/ML + RUL.**
 Feature vector is residuals + operating condition (RPM, load, throttle,
 altitude, ambient T, air density, engine_state) + trend features —
@@ -808,7 +838,22 @@ frozen — see [Before these lock](../contract/README.md#before-these-lock).
 Note the failure matrix currently carries 15 fault rows, not the twelve named
 in this plan's prose; the registry's cross-reference note explains the count.
 
-Everything after Step 0 is still ahead of where the rest of the repo scaffold
+**Steps 1-6 are built and validated.** The canonical environment service
+(`simulation/model/environment_service.slx`), the mean-value engine core
+(`simulation/model/engine_core.slx`), the crank-resolved sidecar
+(`simulation/model/crank_resolved_sidecar.slx`), and the full Step 6 dataset
+pipeline (`simulation/scripts/`) all exist and have been exercised at scale:
+`data/processed/main_batch_1000/` is 123 units / 1111 missions across all 11
+fault classes (healthy + 10), `verify_batch.m`-clean (0 FAIL, 0 WARN). See
+this section's Step 6 log above for the two real engine bugs that surfaced
+and were fixed getting there. **Step 7 has a first working slice**:
+`ml/features/fit_digital_twin.py` + `feature_engineering.py`'s
+`physics_residuals()` (data-driven expected-value models, transient-gated,
+verified to discriminate a real fault — see the Step 7 log above). **Step 8
+onward (the three trained models, bridge, Grafana/Unreal) has not been
+started** — that's where the actual gap is now, not the physics layer.
+
+Everything after Step 7 is still ahead of where the rest of the repo scaffold
 is:
 
 - `data/schema.md` (see the root [`README.md`](../README.md)) predates
@@ -821,8 +866,7 @@ is:
   still section skeletons ("TBD") — this plan and `contract/` are what should
   fill their Layer 1–4 and dependency sections in.
 - The README's three-model ML layer (autoencoder / XGBoost / LSTM) maps onto
-  this plan's Layer 4 (detection / diagnosis / RUL) but hasn't been
-  reconciled field-for-field with the failure matrix yet.
-- No canonical environment service implementation, engine model, crank-resolved
-  sidecar, bridge/CAN layer, or Unreal integration exist in the repo yet —
-  Steps 1 onward are still ahead, now that Step 0 has a first draft.
+  this plan's Layer 4 (detection / diagnosis / RUL) but hasn't been trained
+  yet, nor reconciled field-for-field with the failure matrix.
+- No bridge/CAN layer, Grafana dashboard, or Unreal integration exist in the
+  repo yet — Steps 8 onward are still ahead.
