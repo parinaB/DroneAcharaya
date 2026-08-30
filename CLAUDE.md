@@ -87,16 +87,19 @@ silent bug, not a loud one.
 ## Current status vs. the plan
 
 Step 0 (the `contract/` files) is drafted — see above, now including the
-ground-truth schema and the resolved solver-mode decision. **Step 2 (the
-Simulink engine core) is where active work starts now** — build subsystem by
-subsystem per `build_plan.md`'s order (air+turbo → CRDI fuel → combustion →
-crankshaft → per-cylinder thermal → cooling → lubrication → electrical),
-targeting the frozen contract's exact field names and the AE300-class
-parameter table, not an ad hoc structure. Everything after Step 2
-(`backend/`, `ml/`, `frontend/`) still predates this plan and is simpler than
-it: `data/schema.md` is an older flat schema with seven fault classes vs.
-`contract/`'s draft with 15, no environment service / bridge / crank-resolved
-sidecar exist yet. See
+ground-truth schema and the resolved solver-mode decision. **Steps 1-6 are
+built and validated**: the canonical environment service, the mean-value
+engine core (`engine_core.slx`), the crank-resolved sidecar
+(`crank_resolved_sidecar.slx`), and the full Step 6 dataset-generation
+pipeline all exist. `data/processed/main_batch_1000/` is the real training
+dataset — 123 units / 1111 missions across all 11 fault classes,
+`verify_batch.m`-clean (0 FAIL, 0 WARN) — ready to hand off for the
+multi-headed LSTM (telemetry as input, groundtruth as labels: fault_class,
+health trajectories, severity, RUL). **Step 7 onward (digital twin, AI/ML,
+bridge, Grafana/Unreal) is where active work starts now** — nothing there
+has been built yet. `backend/`/`ml/`/`frontend/` still predate this plan and
+are simpler than it: `data/schema.md` is an older flat schema with seven
+fault classes vs. `contract/`'s draft with 15. See
 [Status vs. this plan](docs/build_plan.md#status-vs-this-plan) in the build
 plan for the full gap list. Don't assume the scaffold already implements the
 plan — check the gap list first.

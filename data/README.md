@@ -13,8 +13,9 @@ data/
   raw/              Gitignored scratch space for one-off / ad-hoc simulation
                      runs (see raw/README.md). Not the structured dataset.
   processed/
-    <batch_name>/    e.g. sanity_batch_001 -- one batch = one call to
-                     simulation/scripts/run_fleet_missions.m
+    <batch_name>/    e.g. main_batch_1000 (the current full training dataset:
+                     123 units / 1111 missions, verify_batch.m-clean) -- one
+                     batch = one call to simulation/scripts/run_fleet_missions.m
       train/
         telemetry/      <run_id>.csv           <- model INPUT (Xs)
         groundtruth/    <run_id>_groundtruth.csv
@@ -248,6 +249,19 @@ healthy baseline at matching conditions, not a single-mission threshold) are
 real gaps in automated coverage, not resolved just because they're not
 `FAIL`.
 
+**It caught two more real bugs scaling up to `main_batch_1000`.** A unit
+whose manufacturing-tolerance draw pushed friction just high enough could
+sag below idle RPM during the throttle ramp and stall permanently (no fuel
+scheduling ever referenced actual RPM, only commanded throttle) — engine
+dead for the rest of the mission. Fixed with a closed-loop idle-speed
+governor in `engine_core`. That governor's fuel trim, uncapped, could then
+demand more fuel than available intake air could support during a fast
+recovery, crashing AFR into single digits and producing EGT spikes past
+4000°C — `verify_batch.m`'s `B_egt` check (>1200°C) caught this immediately.
+Fixed with an AFR-floored smoke limiter, placed after (not before) the
+injection-timing-drift fault's BSFC penalty multiplies fuel. See
+`docs/build_plan.md`'s Step 6 log for the full story.
+
 ## Known limitations — read before assuming a column is more complete than it is
 
 - **`engine_load` is a placeholder equal to `throttle`.** No independent
@@ -262,12 +276,16 @@ real gaps in automated coverage, not resolved just because they're not
 - **Only `cht_c3` has a real sensor-fault corruption path.** Every other
   telemetry column is identical to its groundtruth value.
 - **1Hz single export rate for the whole file** — see "Sample rate" above.
-- **This is a small sanity batch (`sanity_batch_001`: 11 units, 2 missions
-  each), not the full designed sweep.** `docs/build_plan.md`'s Step 6 calls
-  for ~225-360 units x ~20-50 missions each; that full batch has not been
-  run (no Parallel Computing Toolbox on the generation machine — it would
-  be a multi-hour-to-multi-day sequential job). Expect thin coverage per
-  fault class and per severity band until a larger batch exists.
+- **The full designed sweep has been run: `main_batch_1000` (123 units,
+  1111 missions across all 11 fault classes, `verify_batch.m`-clean).**
+  Smaller than `docs/build_plan.md`'s Step 6 estimate of ~225-360 units
+  (no Parallel Computing Toolbox on the generation machine, so scale was
+  capped by sequential compute time), but every fault class has real
+  severity-spread coverage (0 to that class's `max_severity` from
+  `failure-mode-matrix.csv`) plus a healthy baseline across all 5 mission
+  shapes. `sanity_batch_001` and `validation_batch_short2` were earlier,
+  much smaller batches used only to validate the pipeline before this run —
+  not meant for training.
 - **No held-out generalization set yet** (a whole mission-shape or
   severity band never seen in training) — `ml/evaluation/README.md` calls
   for one; only train/validation exist so far.
