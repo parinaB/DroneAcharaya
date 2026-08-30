@@ -11,6 +11,8 @@ README and `.gitkeep` are tracked.
 
 ```
 ml/artifacts/
+├── digital_twin/<version>/     one HistGradientBoostingRegressor per target
+│                                channel + metadata.json -- see fit_digital_twin.py
 ├── autoencoder/<version>/
 ├── xgboost_classifier/<version>/
 └── lstm_rul/<version>/
@@ -18,7 +20,11 @@ ml/artifacts/
 
 Each version directory carries the model file, its scaler, a `metadata.json`
 (feature order, hyperparameters, metrics, dataset identifier) and an `eval/`
-subfolder. `<version>` is `vN` assigned in order.
+subfolder. `<version>` is `vN` assigned in order. `digital_twin/` is the one
+exception to "one file per version" -- it's one `.joblib` file per target
+channel (see its `metadata.json`'s `target_channels` for the list) since each
+channel gets its own independently-fit expected-value model, not a single
+multi-output model.
 
 The backend loads from here via `backend/app/core/model_loader.py`, resolving
 paths against `Settings.artifacts_dir`.

@@ -95,11 +95,16 @@ pipeline all exist. `data/processed/main_batch_1000/` is the real training
 dataset — 123 units / 1111 missions across all 11 fault classes,
 `verify_batch.m`-clean (0 FAIL, 0 WARN) — ready to hand off for the
 multi-headed LSTM (telemetry as input, groundtruth as labels: fault_class,
-health trajectories, severity, RUL). **Step 7 onward (digital twin, AI/ML,
-bridge, Grafana/Unreal) is where active work starts now** — nothing there
-has been built yet. `backend/`/`ml/`/`frontend/` still predate this plan and
-are simpler than it: `data/schema.md` is an older flat schema with seven
-fault classes vs. `contract/`'s draft with 15. See
+health trajectories, severity, RUL). **Step 7 (digital twin residuals) has
+a first working slice**: `ml/features/fit_digital_twin.py` fits data-driven
+expected-value models from healthy-baseline missions, and
+`ml/features/feature_engineering.py`'s `physics_residuals()` applies them
+with transient-state gating — verified to cleanly discriminate a real fault
+(see `build_plan.md`'s Step 7 log). **Step 8 onward (autoencoder/XGBoost/
+LSTM training, bridge, Grafana/Unreal) has not been started.**
+`backend/`/`frontend/` still predate this plan and are simpler than it:
+`data/schema.md` is an older flat schema with seven fault classes vs.
+`contract/`'s draft with 15. See
 [Status vs. this plan](docs/build_plan.md#status-vs-this-plan) in the build
 plan for the full gap list. Don't assume the scaffold already implements the
 plan — check the gap list first.
