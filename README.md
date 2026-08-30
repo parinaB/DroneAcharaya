@@ -84,8 +84,14 @@ cd frontend && npm run lint && npm run typecheck && npm run build
 
 ## Status
 
-Scaffold. Module routes, training scripts and feature functions are stubs;
-`docs/architecture.md`, `docs/methodology.md` and `docs/deployment_roadmap.md`
-are heading skeletons. `data/schema.md`, `ml/evaluation/README.md` and the
-`simulation/` READMEs carry real decisions and are the place to start reading.
-test for pr 
+`simulation/` (the physics layer: environment service, engine core,
+crank-resolved sidecar, and the full dataset-generation pipeline) is built
+and validated — see `docs/build_plan.md`'s Step 6 log and
+`data/processed/main_batch_1000/` (123 units, 1111 missions,
+`verify_batch.m`-clean) for the real training dataset. Everything else is
+still scaffold: `backend/` module routes, `ml/` training scripts, and
+`frontend/` feature functions are stubs; `docs/architecture.md`,
+`docs/methodology.md` and `docs/deployment_roadmap.md` are heading
+skeletons. `data/README.md`, `ml/evaluation/README.md`, and the
+`simulation/` READMEs carry the real decisions and are the place to start
+reading. 
