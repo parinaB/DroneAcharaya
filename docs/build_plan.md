@@ -658,6 +658,45 @@ one. Re-verified clean: 0 FAIL, 0 WARN across all 22 missions after
 regenerating the batch with the fix. See `data/README.md`'s "Verifying a
 batch" section for the full check list and how to run it against any batch.
 
+**Update — the full designed sweep has been run: `main_batch_1000`, 123
+units / 1111 missions, `verify_batch.m` clean (0 FAIL, 0 WARN) across the
+complete set.** Getting there surfaced two more real `engine_core` bugs,
+both now fixed:
+
+- **Permanent stall with no recovery.** Fuel was scheduled purely off
+  commanded throttle with no RPM feedback (deliberately, per this file's
+  earlier note on turbo/altitude derating) and `CmpEngineRunning` cut fuel
+  to zero below 400 RPM with no restart path. A unit whose
+  manufacturing-tolerance draw pushed friction just high enough could sag
+  through that threshold during the idle throttle-ramp and never recover —
+  the engine coasted to 0 RPM and stayed there for the rest of the mission.
+  Fixed with a real idle-speed governor (`Eng.IdleGovernorKp_kgh_per_rpm`,
+  `Eng.IdleGovernorMaxTrim_kg_h`): a closed-loop fuel trim, proportional to
+  the RPM shortfall below `IdleRPM_crank`, that fades to zero at/above idle
+  so throttle-scheduled fueling elsewhere is untouched.
+- **Idle-recovery over-fueling.** The governor's trim, uncapped, could
+  demand more fuel than the (also RPM-scaled) intake air could support
+  during a fast recovery, crashing AFR into single digits and producing a
+  nonphysical EGT spike (>4000°C). Fixed with a smoke limiter
+  (`Eng.AFRSmokeLimit`) that floors total commanded fuel at a minimum AFR —
+  placed *after* the injection-timing-drift fault's BSFC penalty
+  multiplies fuel, not before it, since an earlier placement let that
+  fault's penalty push fuel back past the cap it had just enforced.
+
+The multi-hour-per-mission slowdowns hit while chasing these down turned
+out to be two unrelated infrastructure issues, not anything about the fault
+physics: (1) every killed/relaunched `matlab -batch` process left an
+orphaned Simulink `.dmr` signal-logging temp file behind (some grew to
+13-25GB), which silently filled the system drive over the course of a long
+debugging session; (2) once disk space was ruled out, missions that had
+been stalling for 30-60+ min inside a long-running `-batch` session
+completed in under a minute when run in an already-warm interactive MATLAB
+session instead — pointing at `-batch` cold-start/first-compile overhead as
+the real remaining cost, not the mission computation itself. Practical
+takeaway for future large batches: prefer resuming work in an existing warm
+session over repeatedly relaunching fresh `-batch` processes, and clean up
+orphaned `.dmr` files in `%TEMP%` after any killed MATLAB process.
+
 **Step 7 — Digital twin (residual + state).**
 Runs the validated engine model forward as the live expected reference, fed
 by the same canonical environment service. Signal is always measured −
@@ -808,7 +847,19 @@ frozen — see [Before these lock](../contract/README.md#before-these-lock).
 Note the failure matrix currently carries 15 fault rows, not the twelve named
 in this plan's prose; the registry's cross-reference note explains the count.
 
-Everything after Step 0 is still ahead of where the rest of the repo scaffold
+**Steps 1-6 are built and validated.** The canonical environment service
+(`simulation/model/environment_service.slx`), the mean-value engine core
+(`simulation/model/engine_core.slx`), the crank-resolved sidecar
+(`simulation/model/crank_resolved_sidecar.slx`), and the full Step 6 dataset
+pipeline (`simulation/scripts/`) all exist and have been exercised at scale:
+`data/processed/main_batch_1000/` is 123 units / 1111 missions across all 11
+fault classes (healthy + 10), `verify_batch.m`-clean (0 FAIL, 0 WARN). See
+this section's Step 6 log above for the two real engine bugs that surfaced
+and were fixed getting there. **Step 7 onward (digital twin, AI/ML, bridge,
+Grafana/Unreal) has not been started** — that's where the actual gap is now,
+not the physics layer.
+
+Everything after Step 6 is still ahead of where the rest of the repo scaffold
 is:
 
 - `data/schema.md` (see the root [`README.md`](../README.md)) predates
@@ -823,6 +874,5 @@ is:
 - The README's three-model ML layer (autoencoder / XGBoost / LSTM) maps onto
   this plan's Layer 4 (detection / diagnosis / RUL) but hasn't been
   reconciled field-for-field with the failure matrix yet.
-- No canonical environment service implementation, engine model, crank-resolved
-  sidecar, bridge/CAN layer, or Unreal integration exist in the repo yet —
-  Steps 1 onward are still ahead, now that Step 0 has a first draft.
+- No digital twin, bridge/CAN layer, Grafana dashboard, or Unreal integration
+  exist in the repo yet — Steps 7 onward are still ahead.
