@@ -118,11 +118,76 @@ for ui = 1:numel(fleet)
                     theta.(theta_field) = val;
                 end
             end
-            assignin('base','Eng',Eng);
 
-            % ---- mission profile ------------------------------------------
+            % ---- mission profile (needed before sensor-fault wiring below,
+            % since onset timing is relative to THIS mission's duration) ---
             mopts = sample_mission_params(unit.mission_shape, lhs(mi,:));
             profile = generate_mission_profile(unit.mission_shape, mopts);
+
+            % ---- sensor-fault severity wiring for this mission -------------
+            % generate_fleet.m only draws WHICH type + WHEN (onset_hours);
+            % actually setting the Eng severity parameters that make
+            % engine_core produce a genuinely corrupted signal happens here.
+            % Real fault magnitudes (mid-range of AeroDieselEngineParameters.m's
+            % documented 0-20degC bands), applied only from the mission where
+            % the unit's onset threshold is first crossed onward -- pre-onset
+            % missions keep Eng's healthy-baseline defaults (0 / "never").
+            sensor_fault = struct('channel', unit.sensor_fault_channel, ...
+                'type', unit.sensor_fault_type, 'onset_s', inf, 'end_s', inf);
+            is_dropout = strcmp(unit.sensor_fault_type, 'DROPOUT');
+            if is_dropout
+                % One-off intermittent window: only the SINGLE mission whose
+                % span actually straddles the onset point gets it, unlike
+                % the persistent types below (which stay active in every
+                % mission once their threshold is crossed).
+                onset_reached = accumulated_hours*3600 <= unit.sensor_fault_onset_hours*3600 && ...
+                    unit.sensor_fault_onset_hours*3600 < accumulated_hours*3600 + profile.duration_s;
+            else
+                onset_reached = ~strcmp(unit.sensor_fault_type,'NONE') && ...
+                    accumulated_hours*3600 + profile.duration_s > unit.sensor_fault_onset_hours*3600;
+            end
+            if onset_reached
+                onset_s_in_mission = max(0, unit.sensor_fault_onset_hours*3600 - accumulated_hours*3600);
+                switch unit.sensor_fault_type
+                    case 'DRIFT'
+                        % Ramp resets every mission (plain Simulink Ramp
+                        % block, start=0, no persisted state) -- once onset
+                        % is crossed, the whole mission ramps from its own
+                        % t=0; label matches (whole-mission active), not a
+                        % mid-mission switch, since the model has no
+                        % onset-time input on this particular block.
+                        Eng.SensorDriftRate_c3_degC_per_s = 0.00625; % ~15degC over a 40min mission
+                        sensor_fault.onset_s = 0;
+                    case 'BIAS'
+                        Eng.SensorBiasOffset_c3_degC = 12; % mid-upper of the 0-20degC band
+                        sensor_fault.onset_s = 0;
+                    case 'NOISE'
+                        Eng.SensorNoiseSigma_c3_degC = 3; % clearly above clean baseline
+                        sensor_fault.onset_s = 0;
+                    case 'STUCK'
+                        % Eng.SensorStuckActivationTime_s genuinely supports
+                        % within-mission timing -- use the real onset point
+                        % in the transition mission, then activate 1s in for
+                        % every mission after (NOT literally 0 -- the Memory
+                        % block would freeze at its t=0 initial condition,
+                        % the exact degenerate case
+                        % AeroDieselEngineParameters.m's comments warn
+                        % against, never having passed a real reading
+                        % through).
+                        stuck_activation_s = max(1, onset_s_in_mission);
+                        Eng.SensorStuckActivationTime_s = stuck_activation_s;
+                        sensor_fault.onset_s = stuck_activation_s;
+                    case 'DROPOUT'
+                        % One-off intermittent window, not an ongoing state
+                        % -- only ever active in the single mission it falls
+                        % in, healthy-default ("never") every other mission.
+                        Eng.SensorDropoutStartTime_s = onset_s_in_mission;
+                        Eng.SensorDropoutEndTime_s = onset_s_in_mission + unit.sensor_fault_dropout_duration_s;
+                        sensor_fault.onset_s = onset_s_in_mission;
+                        sensor_fault.end_s = Eng.SensorDropoutEndTime_s;
+                end
+            end
+            assignin('base','Eng',Eng);
 
             assignin('base','MissionThrottle', profile.throttle);
             assignin('base','MissionAltitude', profile.altitude);
@@ -148,15 +213,6 @@ for ui = 1:numel(fleet)
                     'map_kpa',map_out(idx),'injection_timing_deg',inj_timing(idx), ...
                     'misfire_rate',misfire_vec,'combustion_stability',theta.combustion_stability);
                 phase_features.(ph) = run_sidecar_burst(seed, Eng);
-            end
-
-            % ---- sensor fault activation for this mission ------------------
-            sensor_fault = struct('channel', unit.sensor_fault_channel, ...
-                'type', unit.sensor_fault_type, 'onset_s', inf);
-            if ~strcmp(unit.sensor_fault_type,'NONE') && ...
-                    accumulated_hours*3600 + profile.duration_s > unit.sensor_fault_onset_hours*3600
-                onset_s = max(0, unit.sensor_fault_onset_hours*3600 - accumulated_hours*3600);
-                sensor_fault.onset_s = onset_s;
             end
 
             % ---- export ------------------------------------------------------
