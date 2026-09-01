@@ -1,0 +1,103 @@
+<mxfile host="app.diagrams.net" agent="claude-code" version="24.7.0">
+  <diagram id="droneacharaya-infra" name="Infra - Bridge, TimescaleDB, Grafana">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="826" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Host machine boundary -->
+        <mxCell id="host" value="Host machine (local dev / demo box)" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fillColor=#F5F5F5;strokeColor=#666666;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="820" height="480" as="geometry" />
+        </mxCell>
+
+        <!-- Docker network boundary -->
+        <mxCell id="net" value="docker compose network: droneacharaya-net" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;dashed=1;fillColor=#E8F0FE;strokeColor=#4472C4;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="70" y="90" width="760" height="330" as="geometry" />
+        </mxCell>
+
+        <!-- timescaledb service -->
+        <mxCell id="ts" value="timescaledb&#10;(timescale/timescaledb:latest-pg16)&#10;container port 5432 -&gt; host 5433" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="100" y="140" width="200" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- backend service -->
+        <mxCell id="be" value="backend&#10;(FastAPI + bridge: uvicorn app.main:app)&#10;port 8000" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="360" y="140" width="200" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- grafana service -->
+        <mxCell id="gf" value="grafana&#10;container port 3000 -&gt; host 3001&#10;(3000 reserved for Next.js dev server)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="620" y="140" width="180" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- volumes / mounts -->
+        <mxCell id="vol-ts" value="volume: timescale-data" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#999999;dashed=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="100" y="270" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vol-ml" value="bind mount (read-only): ml/artifacts/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#999999;dashed=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="360" y="270" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vol-data" value="bind mount (read-only): data/sample_runs/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#999999;dashed=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="360" y="340" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="vol-gf" value="volume: grafana-provisioning&#10;(datasource + dashboard JSON)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#999999;dashed=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="620" y="270" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- external actors -->
+        <mxCell id="browser-gf" value="Browser&#10;(operator - Grafana dashboards)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="620" y="560" width="180" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="unreal" value="Unreal Engine client&#10;(GCS visualization - Step 11, not built yet)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=12;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="360" y="560" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="mleng" value="ML engineer&#10;(drops versioned artifact dir&#10;out-of-band, Phase 7)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=12;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="560" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- edges -->
+        <mxCell id="e-be-ts" value="writes telemetry / residuals / health_scores&#10;(SQLAlchemy + Alembic-migrated schema)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;" edge="1" parent="1" source="be" target="ts">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-gf-ts" value="native Postgres datasource&#10;(read-only SQL queries)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;" edge="1" parent="1" source="gf" target="ts">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-browser-gf" value="HTTPS :3001" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;" edge="1" parent="1" source="browser-gf" target="gf">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-unreal-be" value="REST poll (/api/v1/replay/*, /inference/latest)&#10;+ WS stream (Phase 6), port 8000" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;" edge="1" parent="1" source="unreal" target="be">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-be-volml" value="model_loader.py reads&#10;(Phase 7, in-process load - not a separate model service)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;" edge="1" parent="1" source="be" target="vol-ml">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-mleng-volml" value="copies versioned artifact dir" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;dashed=1;" edge="1" parent="1" source="mleng" target="vol-ml">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-be-voldata" value="bridge ReplaySource reads&#10;fixture/run CSVs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=10;" edge="1" parent="1" source="be" target="vol-data">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-ts-volts" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=none;dashed=1;" edge="1" parent="1" source="ts" target="vol-ts">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e-gf-volgf" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=none;dashed=1;" edge="1" parent="1" source="gf" target="vol-gf">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

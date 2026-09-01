@@ -1,5 +1,12 @@
 # Autoencoder — unsupervised anomaly detection
 
+**Status: training in progress**, in `autoencoder_training.ipynb`, off
+`ml/notebooks/DroneAcharaya_Preprocessing.ipynb`'s output (see
+`../README.md`'s "What the preprocessing notebook outputs" section for the
+exact input it consumes — `merged_df`, healthy-filtered, per-timestep, not
+the windowed arrays). No artifact/metrics to report yet; `train.py` below is
+still the CLI-stub path, not what's actually being run right now.
+
 Learns to reconstruct **nominal** engine behaviour. At inference, reconstruction
 error becomes an anomaly score; a sustained rise flags "something is wrong"
 before the supervised classifier can name the fault.

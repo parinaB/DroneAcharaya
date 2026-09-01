@@ -46,6 +46,10 @@ __pycache__/
 *$py.class
 *.so
 
+# Local SQLite dev DB (backend/app/core/config.py's database_url default) --
+# never the real Supabase Postgres, just a throwaway local file.
+backend/dev.db
+
 # Packaging / distribution
 build/
 dist/
