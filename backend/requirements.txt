@@ -11,6 +11,13 @@ torch
 shap
 python-multipart
 
+# persistence (Step 9 bridge/replay -- Supabase Postgres in prod, sqlite
+# locally by default so `uvicorn app.main:app --reload` works with zero
+# setup; see backend/app/core/config.py's database_url default)
+sqlalchemy
+alembic
+psycopg2-binary
+
 # dev / test
 pytest
 httpx

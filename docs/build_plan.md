@@ -754,10 +754,44 @@ everything else's variable rate. This is the seam where "Simulink engine"
 later swaps to "real ECU." Replay re-publishes recorded frames onto the same
 bus, so live and replay run identical downstream code.
 
-**Step 10 — Grafana / headless presentation.**
+*Status: first vertical slice built.* `backend/app/bridge/` — a
+`FrameSource` protocol (`sources.py`) with a `ReplaySource` implementation
+that paces a run's telemetry CSV to real time; `BridgeService` orchestrating
+per-frame DB writes (`app/db/writer.py` — the write path *is* the recorder,
+not a separate component) and an in-process broadcast for a future WS
+consumer; `can_framing.py` explicitly stubbed (`NotImplementedError`, same
+pattern as `model_loader.py`) since no live CAN-bus ECU exists yet. Backing
+store is plain Postgres via SQLAlchemy + Alembic — **not TimescaleDB**; the
+deployment decision (Render + Supabase's free tier, which doesn't support
+the Timescale extension) landed before this slice was built, so it was
+built against plain tables from the start rather than hypertables later
+removed. `/replay`, `/inference`, `/advisory` now serve real DB-backed
+data (inference via a ground-truth stand-in — see `app/modules/inference/
+service.py` — mapping `fault_class` to its `contract/
+health-parameter-registry.md` health column; real model wiring is a later
+item, not started). End-to-end verified with a hand-built smoke run
+(5-frame replay → DB → health-score trend correctly dropping as
+`injector_health_c3` decays), not yet against real committed data —
+`data/sample_runs/` is empty, waiting on the team's real data (its own
+README documents the exact layout `ReplaySource` expects).
+
+**Step 10 — Grafana / headless presentation.** *(Superseded — see status
+note below.)*
 Full operator picture without Unreal: health indices, residual traces, fault
 probability, RUL band, telemetry, mission timeline, advisory. The complete
 system is demonstrable here.
+
+*Status: dropped, decided.* Once `frontend/`'s real dashboard PR merged (a
+purpose-built operator UI — cylinder thermals, twin-divergence chart,
+health/RUL, an anomaly feed, an XAI "why this prediction" panel — see
+`frontend/app/dashboard/_components/LiveDashboard.tsx`), it was a strictly
+better fit for this project's exact narrative than a generic Grafana panel
+set would be, at no extra backend cost (the API work Step 9 needed either
+way). Everything Step 10 wanted the operator to see is now this frontend's
+job; Grafana isn't part of the stack. See `ops/infra/README.md` for the full
+reasoning. **What replaced it isn't finished, though** — the frontend is
+currently 100% hardcoded/mocked data, not wired to Step 9's new endpoints
+yet; that wiring is the real next gap, not a new Grafana integration.
 
 **Step 11 — Unreal integration.**
 Atmosphere scenario input (altitude, weather, temperature offset, wind — fed
@@ -888,9 +922,19 @@ this section's Step 6 log above for the two real engine bugs that surfaced
 and were fixed getting there. **Step 7 has a first working slice**:
 `ml/features/fit_digital_twin.py` + `feature_engineering.py`'s
 `physics_residuals()` (data-driven expected-value models, transient-gated,
-verified to discriminate a real fault — see the Step 7 log above). **Step 8
-onward (the three trained models, bridge, Grafana/Unreal) has not been
-started** — that's where the actual gap is now, not the physics layer.
+verified to discriminate a real fault — see the Step 7 log above). **Step 8 is underway**: autoencoder and LSTM training are actively in
+progress (ML engineers working from
+`ml/notebooks/DroneAcharaya_Preprocessing.ipynb` plus the per-model training
+notebooks in `ml/training/autoencoder/` and `ml/training/lstm_rul/`); the
+XGBoost classifier hasn't started yet. **Step 9 also has a first vertical
+slice** (bridge + DB-backed replay/inference/advisory endpoints — see the
+Step 9 log above) — built against plain Postgres, not TimescaleDB, and idle
+until `data/sample_runs/` has real data in it. **Step 10 is dropped**
+(Grafana → the merged frontend, see the Step 10 log above). Unreal (Step 11)
+remains untouched — that's where the actual gap is now, not the physics
+layer, and not really the backend either: the frontend-to-backend wiring
+(real UI, real endpoints, currently not talking to each other) is the most
+concrete near-term gap.
 
 Everything after Step 7 is still ahead of where the rest of the repo scaffold
 is:
@@ -899,13 +943,19 @@ is:
   `contract/` and defines an older, simpler flat telemetry schema with seven
   fault classes. It should be superseded by `contract/telemetry-schema.yaml`
   once that locks — until then, treat `contract/` as the newer draft and
-  `data/schema.md` as what `backend/`/`ml/`/`frontend/` currently actually
-  implement.
+  `data/schema.md` as what `ml/`/`frontend/` currently actually implement —
+  `backend/`'s new bridge/DB code (Step 9) already targets `contract/`'s
+  field names directly, not `data/schema.md`'s older set, since it was built
+  after this gap was known.
 - `docs/architecture.md`, `docs/methodology.md`, and `docs/ps_mapping.md` are
   still section skeletons ("TBD") — this plan and `contract/` are what should
   fill their Layer 1–4 and dependency sections in.
 - The README's three-model ML layer (autoencoder / XGBoost / LSTM) maps onto
-  this plan's Layer 4 (detection / diagnosis / RUL) but hasn't been trained
-  yet, nor reconciled field-for-field with the failure matrix.
-- No bridge/CAN layer, Grafana dashboard, or Unreal integration exist in the
-  repo yet — Steps 8 onward are still ahead.
+  this plan's Layer 4 (detection / diagnosis / RUL); autoencoder and LSTM
+  training are now in progress, XGBoost hasn't started, and none of the
+  three has been reconciled field-for-field with the failure matrix yet.
+- Bridge/replay (Step 9) has a first real slice (see above) but no CAN layer
+  (stubbed, no live ECU exists to frame). Grafana (Step 10) is dropped, not
+  built. Unreal (Step 11) doesn't exist yet. The frontend that replaced
+  Grafana is merged but not wired to the backend — that pairing is the
+  actual next gap.

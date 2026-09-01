@@ -1,12 +1,15 @@
 # LSTM — multi-head engine health / RUL / sensor-fault model
 
-Trained in `lstm_training.ipynb` (Kaggle/Colab GPU), not yet ported to
-`train.py`. Weights and preprocessing artifacts are versioned in
-`ml/artifacts/lstm_rul/v1/` (gitignored; not committed) — see
-[Artifacts](#artifacts) below. This README documents the notebook's current,
-ruff-clean state and its most recent training run; treat it as the source of
-truth over the older `train.py`/single-task-RUL skeleton this folder used to
-describe.
+**Status: training in progress**, in `lstm_training.ipynb`, off
+`ml/notebooks/DroneAcharaya_Preprocessing.ipynb`'s windowed output (see
+`../README.md`'s "Multi-head LSTM" section — `X_train`/`X_val` plus the
+three label arrays `y_health`, `y_rul`, `y_sensor_fault`). No artifact/
+metrics to report yet; `train.py` below is still the CLI-stub path, not
+what's actually being run right now.
+
+Predicts how much operating time remains before the degradation crosses the
+failure threshold. Sequential model because RUL depends on the *trajectory* of
+degradation, not the instantaneous state.
 
 ## What it predicts, and when
 

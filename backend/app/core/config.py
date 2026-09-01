@@ -26,6 +26,18 @@ class Settings(BaseSettings):
     artifacts_dir: Path = Path("../ml/artifacts")
     data_dir: Path = Path("../data")
 
+    # Defaults to a local SQLite file so `uvicorn app.main:app --reload`
+    # works with zero setup. Production points this at Supabase's Postgres
+    # connection-pooler string via the DATABASE_URL env var / backend/.env
+    # (not committed) -- nothing in backend/app/db/ is Postgres-specific
+    # (no TimescaleDB/hypertables, see ops/infra/README.md for why), so the
+    # same code path runs against either.
+    database_url: str = "sqlite:///./dev.db"
+
+    # Render injects its own PORT at runtime; unused by the app directly
+    # (uvicorn's CMD reads it), kept here only so it's a documented setting.
+    port: int = 8000
+
 
 @lru_cache
 def get_settings() -> Settings:
