@@ -1,11 +1,12 @@
 # LSTM — multi-head engine health / RUL / sensor-fault model
 
 Trained in `lstm_training.ipynb` (Kaggle/Colab GPU), not yet ported to
-`train.py`. Weights and preprocessing artifacts are stored in Drive, not in
-this repo — see [Artifacts](#artifacts) below. This README documents the
-notebook's current, ruff-clean state and its most recent training run; treat
-it as the source of truth over the older `train.py`/single-task-RUL skeleton
-this folder used to describe.
+`train.py`. Weights and preprocessing artifacts are versioned in
+`ml/artifacts/lstm_rul/v1/` (gitignored; not committed) — see
+[Artifacts](#artifacts) below. This README documents the notebook's current,
+ruff-clean state and its most recent training run; treat it as the source of
+truth over the older `train.py`/single-task-RUL skeleton this folder used to
+describe.
 
 ## What it predicts, and when
 
@@ -64,46 +65,57 @@ model weight which of the 60 input seconds matter most for a given
 head/window, instead of forcing all temporal information through a single
 final LSTM state.
 
-Capacity was increased from an earlier `128/2-layer/dropout=0.3` baseline to
-the `256/3-layer/dropout=0.5` configuration above — more capacity, with
-correspondingly heavier dropout to control overfitting.
-
 ### Multi-task loss
 
 ```python
 total = alpha * health_loss + beta * rul_loss + gamma * sensor_fault_loss
-# alpha=1.0, beta=1.0, gamma=0.1 (this run; joint_loss's own default is 0.4)
+# alpha=1.0, beta=1.0, gamma=0.1
 ```
 
 `gamma` is deliberately lower than `alpha`/`beta`. Health and RUL are
 regression losses (MSE) that behave smoothly across epochs; the sensor-fault
 head's cross-entropy — even after class-weighting — is inherently noisier
-epoch-to-epoch because the rare fault classes (down to single-digit counts
-per validation batch for the rarest channel) make its loss sensitive to a
+epoch-to-epoch because the rare fault classes make its loss sensitive to a
 handful of hard examples. A lower `gamma` keeps that noise from dominating
-the training signal and, more importantly, from dominating **checkpoint
-selection**. This run used `gamma=0.1` (passed explicitly at call time, via
-`NEW_GAMMA_LOSS_WEIGHT`), lower than the function's own `gamma=0.4` default —
-tightened further after observing the sensor-fault term still swinging
-val loss noticeably at 0.4.
-
-**Checkpoint selection is `health_loss + rul_loss` only**, not total loss —
-letting total loss pick the checkpoint meant occasionally saving a worse
-health/RUL epoch just because sensor-fault got a lucky batch composition that
-epoch. Decoupling fixed that.
+training and, more importantly, from dominating **checkpoint selection**
+(`val_health_loss + val_rul_loss` only, not total loss).
 
 **Optimizer / schedule**: Adam, `lr=5e-4`, `weight_decay=1e-4`, with
 `ReduceLROnPlateau(mode='min', factor=0.5, patience=5)` stepped on
-`checkpoint_score` (health+RUL), and early stopping at `patience=10` epochs
-of no improvement on the same metric.
+`checkpoint_score`, and early stopping at `patience=10` epochs of no
+improvement on the same metric. `BATCH_SIZE=64`.
+
+### New this run: `WeightedRandomSampler` — and why it backfired
+
+This run adds a `WeightedRandomSampler` on top of the existing per-channel
+class-weighted cross-entropy: for every training window, it takes the
+*maximum* of that window's class weight across both sensor-fault channels,
+then oversamples high-weight (rare-class) windows with replacement so each
+epoch sees more of them than their natural frequency would give.
+
+**This measurably hurt the model.** The `cht_c3` channel's NONE-class recall
+collapsed from a healthy ~0.94 (previous run, loss-reweighting only) to
+**0.35** — the model now predicts a fault on the majority of genuinely
+healthy windows. Any-fault-detection precision on that channel fell to
+**0.164** (down from 0.692), while recall rose to 0.982. In plain terms: the
+sampler taught the model "when in doubt, guess a fault," which spikes
+recall but makes the classifier nearly useless for an advisory system that
+needs to trust a "fault detected" alert. The sensor-fault loss curve (below)
+shows the mechanism directly — train loss drops to near-zero while val loss
+plateaus around 0.8-1.0, a train/val gap consistent with the sampler fitting
+an artificially rebalanced training distribution that no longer matches
+validation's natural class frequencies.
+
+**Do not adopt this sampler as-is.** See
+[Known limitations](#known-limitations) for what to try instead.
 
 ## Training data
 
 `data/raw/{telemetry,groundtruth}_{train,validation}.csv` — the
-`main_batch_1000` MVEM export, consolidated per-run into 4 CSVs (see
-`ml/notebooks/DroneAcharaya_Preprocessing.ipynb` and this notebook's own load
-cells for the consolidation logic). Split is **by `run_id`**, assigned by the
-export itself (not a random re-split): 1146 train runs / 325 validation runs.
+`main_batch_1000` MVEM export (third consolidated batch; see git history of
+this file for the two prior batches' distributions), consolidated per-run
+into 4 CSVs. Split is **by `run_id`**, assigned by the export itself (not a
+random re-split): 1312 train runs / 375 validation runs.
 
 Key preprocessing steps (all in `lstm_training.ipynb`, ahead of
 `build_windows()`):
@@ -116,9 +128,9 @@ Key preprocessing steps (all in `lstm_training.ipynb`, ahead of
   doesn't compute a value in `IDLE`/`CRUISE`/`SHUTDOWN`/`STARTING`/
   `THROTTLE_TRANSIENT`/`LOITER`/`CLIMB`/`DESCENT`) — handled with a
   `{col}_missing` flag column plus fill-with-0 (0 = training mean, post-scaling).
-- `StandardScaler` fit on training-split rows only (and now saved to
-  `scaler.joblib` — see [Artifacts](#artifacts)); `OneHotEncoder` for
-  `engine_state` (12 categories) fit on training-split rows only.
+- `StandardScaler` fit on training-split rows only (saved to
+  `scaler.joblib`); `OneHotEncoder` for `engine_state` (12 categories) fit on
+  training-split rows only.
 - Windowing: `seq_len=60`, `stride=10` (not 1 — avoids a ~20GB `X_train` at
   stride 1), `forecast_horizon=60`.
 
@@ -126,144 +138,131 @@ Key preprocessing steps (all in `lstm_training.ipynb`, ahead of
 
 ![RUL distribution](assets/rul_distribution.png)
 
-RUL is heavily zero-inflated — the histogram's first bin (normalized RUL ≈0)
-is roughly 4× the height of the next-tallest bin, consistent with the
-`max(0, ...)` clamp right-censoring everything after the first threshold
-crossing. Mean normalized RUL is 0.21 (std 0.34) against a max of 1.91 (i.e.
-~6900s), confirming the distribution is dominated by low/zero values with a
-long tail. (The exact zero-row fraction isn't printed by this cell — worth
-adding `(y_rul_train == 0).mean()` if you want the precise number.) Any
-aggregate RUL error metric is dominated by this majority unless computed on
-the non-zero-RUL subset specifically.
+RUL is heavily zero-inflated (the `max(0, ...)` clamp right-censors
+everything after the first threshold crossing). Mean normalized RUL is 0.24
+(std 0.35) against a max of 1.91 (~6900s) — dominated by low/zero values
+with a long tail.
 
 ![Health parameter distributions](assets/eda_health_hist.png)
 
 All 16 health parameters are similarly right-skewed — the large majority of
 rows sit at 1.0 (fully healthy), with a much smaller mass spread across
-lower values as degradation progresses. This is expected given most of a
-mission is flown before a fault reaches failure-threshold severity.
+lower values as degradation progresses.
 
 ![Sensor-fault class distributions](assets/eda_sensor_fault_dist.png)
 
-`cht_c3` has all 5 classes present in training: NONE 89.78%, DRIFT 4.08%,
-BIAS 2.21%, NOISE 2.20%, STUCK 1.73% (213,578 / 5,257 / 9,695 / 5,238 / 4,113
-windows respectively, out of 237,881 total). `vibration_rms_x_bearing_proxy`
-is far more extreme — NONE 99.98%, DROPOUT just 43 windows (0.02%). This
-imbalance is the root cause of that channel's poor performance below; 43
-positive examples in training is not enough to learn a class from, at any
-`gamma` or class-weighting setting.
+Windowed training-set counts: `cht_c3` — NONE 90.97%, DRIFT 3.60%, BIAS
+1.95%, NOISE 1.95%, STUCK 1.53% (244,708 / 9,695 / 5,257 / 5,238 / 4,113
+windows). `vibration_rms_x_bearing_proxy` — NONE 99.92%, DROPOUT 0.08% (212
+windows, up from a prior batch's 43 — see the batch-3 consolidation note in
+this repo's history — but still a small absolute count for a 6-way
+classifier to learn from).
 
-## Results (this run: early-stopped at epoch 25, best checkpoint epoch 15)
+## Results (this run: early-stopped at epoch 21, best checkpoint epoch 11)
 
 ![Total loss curve](assets/total_loss.png)
 ![Health loss curve](assets/health_loss.png)
 ![RUL loss curve](assets/rul_loss.png)
 ![Sensor-fault loss curve](assets/sensor_fault_loss.png)
 
-Training ran for 25 of a possible 60 epochs before early stopping triggered
-(`patience=10` on `health+rul` checkpoint score, best at epoch 15,
-`checkpoint_score=0.0411`). Note this run's `total_loss`/`sensor_fault_loss`
-plots read noticeably lower in absolute value than earlier runs — this is
-largely `gamma=0.1` shrinking that term's contribution to total loss, not
-necessarily better classification (compare the confusion matrix below against
-the loss curve, they don't move together 1:1).
+Training ran for 21 of a possible 60 epochs before early stopping triggered
+(`patience=10` on `health+rul` checkpoint score, best at epoch 11,
+`checkpoint_score=0.0699`).
 
-**Health head** — converges smoothly, train/val track closely with no
-divergence, ending around `val_health≈0.004`.
+**Health head** — converges well: train loss drops to ~0.0015, val loss
+tracks down to ~0.0096 with no meaningful divergence.
 
-**RUL head** — `val_rul` oscillates in the `0.035-0.06` band (normalized
-units) without a clear further downward trend after ~epoch 10 — this is
-consistent with the RUL zero-inflation noted above: most windows are trivial
-(predict ≈0), and the harder non-zero-RUL windows dominate the residual
-variance from epoch to epoch depending on which ones land in a given batch.
+**RUL head** — `val_rul` sits in the `0.06-0.07` band (normalized units)
+throughout, without a clear downward trend after the first few epochs —
+consistent with RUL's zero-inflation dominating the aggregate metric (see
+[Known limitations](#known-limitations)).
 
 **Sensor-fault head** — full validation-set confusion matrix (not just
 spot-checks):
 
-| Channel | Macro F1 | Any-fault detection precision / recall |
-| --- | --- | --- |
-| `sensor_fault_active_cht_c3` (BIAS/DRIFT/NOISE/STUCK) | 0.84 | 0.692 / 0.913 |
-| `sensor_fault_active_vibration_rms_x_bearing_proxy` (DROPOUT) | 0.50 (collapsed) | 0.000 / nan (no positive predictions) |
+| Channel | Accuracy | Macro F1 | Any-fault precision / recall |
+| --- | --- | --- | --- |
+| `sensor_fault_active_cht_c3` | 0.41 | 0.35 | 0.164 / 0.982 |
+| `sensor_fault_active_vibration_rms_x_bearing_proxy` | 0.88 | 0.47 | 0.004 / 0.673 |
 
-`cht_c3` per-class recall: NONE 0.94, BIAS 0.71, DRIFT 0.81, NOISE 0.88,
-STUCK 0.98 — recall is strong across every class, but precision dropped
-versus an earlier, higher-`gamma` run (DRIFT precision fell to 0.40, with
-3535 NONE windows misclassified as DRIFT). This is the expected tradeoff of
-class-weighting harder (via lower `gamma` letting the weighted CE dominate
-more of that head's own gradient): the model now over-predicts the rare
-classes more readily, trading precision for recall. Whether that tradeoff is
-the right one depends on the advisory layer's cost function for false
-alarms vs. missed faults — not yet decided.
+`cht_c3` confusion matrix shows the over-triggering directly: of 66,761
+true-NONE validation windows, only 23,053 are correctly predicted NONE (35%
+recall) — the remaining ~43,700 are scattered across false BIAS/DRIFT/
+NOISE/STUCK predictions, with STUCK alone absorbing 22,203 of them. STUCK's
+own recall is 1.00, but that's driven by the model defaulting to STUCK on
+ambiguous/healthy windows, not genuine STUCK-detection skill.
 
-`vibration_rms_x_bearing_proxy` (DROPOUT) **still did not learn** — 0/9
-recall on validation. See [Known limitations](#known-limitations).
+`vibration_rms_x_bearing_proxy` shows the same pattern at smaller scale:
+DROPOUT recall rose to 0.673 (up from 0/9 in the batch-2 run — the added
+training examples plus oversampling did teach *some* signal), but precision
+is 0.004 — 9,106 false-positive DROPOUT predictions against only 33 true
+positives. Still not usable as a real detector.
 
 ### Single-sample checks
 
-These are illustrative, not a substitute for the aggregate metrics above —
-individual windows vary widely in difficulty.
+Illustrative only — see the aggregate confusion matrix above for the real
+picture, especially given this run's precision collapse.
 
-**Sample index 64640** (true RUL 1654.0s): predicted **2044.89s (+390.89s
-error, ~24% over)**. Health predictions track true values closely (within
-±0.01-0.05) except `turbo_efficiency_deg` (pred 0.3957 vs true 0.3000,
-+0.0957) — this sample is right at/past that parameter's failure threshold
-(0.3), a harder region for the health head. Both sensor-fault channels
-correctly predicted `NONE`.
+**Sample index 71794** (true RUL 344.0s): predicted 583.80s (+239.80s
+error). Health predictions track true values closely except
+`turbo_efficiency_deg` (pred 0.9931 vs true 0.5063, a sample sitting right at
+that parameter's failure region). Both sensor-fault channels were
+**misclassified** here (`cht_c3`: predicted STUCK, true NONE;
+`vibration_rms_x_bearing_proxy`: predicted DROPOUT, true NONE) — a direct
+instance of the over-triggering behavior quantified above.
 
-**Demo cell, index 53209** (true RUL 318.0s): predicted **388.2s (+70.2s
-error, ~22% over)**. Health predictions all ≈0.997-0.9995 (correctly reading
-"healthy," consistent with this window predating the run's failure).
-`cht_c3` predicted `DRIFT` — the true label for this specific window wasn't
-printed by this cell, so treat this demo as illustrating the *mechanism* of
-a forward pass rather than a validated sensor-fault accuracy claim.
+**Demo cell, index 53209** (true RUL 318.0s): predicted 211.0s (-107.0s
+error). `cht_c3` predicted STUCK — again consistent with the head's bias
+toward over-predicting faults this run.
 
 ## Known limitations
 
-- **`sensor_fault_active_vibration_rms_x_bearing_proxy` (DROPOUT) is not
-  usable.** Only 43 DROPOUT training windows exist out of 237,881 (0.02%,
-  confirmed by the EDA value counts above) — 0/9 recall on the validation set
-  confirms the model never learned this class regardless of architecture/loss
-  tuning. Do not expose DROPOUT detection on this channel to the advisory
-  layer, dashboard, or Unreal until the data generator produces substantially
-  more DROPOUT-class runs. This is a concrete, quantified ask for whoever
-  owns `simulation/fault_injection/`.
-- **`cht_c3` precision/recall tradeoff is not yet tuned to a target
-  operating point.** Lowering `gamma` improved recall but visibly hurt
-  precision (more NONE-as-DRIFT false positives) versus a higher-`gamma`
-  run. Whichever operating point the advisory layer actually wants
-  (fewer false alarms vs. fewer missed faults) should drive `gamma` and/or a
-  decision threshold on the softmax output, rather than argmax by default.
+- **The `WeightedRandomSampler` should not be used as-is.** It measurably
+  regressed sensor-fault precision (see above) by training on an artificially
+  rebalanced distribution that doesn't match real-world (or validation-set)
+  class frequencies. Before reusing this technique: (a) validate against the
+  *natural* validation distribution as done here (not a similarly-resampled
+  validation set, which would hide the problem), and (b) consider a milder
+  oversampling ratio (e.g. cap the max weight, or use `sqrt` of the inverse
+  frequency instead of the raw ratio) rather than full inverse-frequency
+  weighting combined with a hard `max()` across channels.
+- **`sensor_fault_active_vibration_rms_x_bearing_proxy` (DROPOUT) is still
+  data-starved.** 212 training windows out of ~269,000 (0.08%) is better than
+  the previous batch's 43, but still not enough for reliable precision at any
+  reasonable oversampling rate — the 9,106 false positives this run show
+  that "make the model see DROPOUT more often" alone doesn't fix a
+  fundamentally imbalanced problem. More real DROPOUT-class runs from
+  `simulation/fault_injection/` remains the actual fix.
 - **RUL accuracy on the non-zero-RUL subset is not yet aggregated as a single
   number.** The reported `val_rul` MSE is dominated by the large mass of
-  windows at RUL=0 (see the zero-inflated distribution above); single-sample
-  checks are illustrative, not a validated accuracy statistic. Computing
-  RMSE/MAE restricted to the non-zero-RUL validation windows (not yet done)
-  would give the actually decision-relevant error bar for "how far off is
-  the model's forecasted countdown."
-- **`forecast_horizon=60` is a single fixed operating point.** The model has
-  not been evaluated at other horizons (e.g. 10s, 30s) on this batch/config —
-  earlier informal comparisons (different data batch, before the fixes in
-  this doc) suggested shorter horizons are easier to predict but give less
-  lead time; this tradeoff hasn't been systematically swept here.
+  windows at RUL=0; single-sample checks are illustrative, not a validated
+  accuracy statistic.
+- **`forecast_horizon=60` is a single fixed operating point**, not yet swept
+  against alternatives on this batch.
 - **Not yet ported to `ml/features/feature_engineering.py` or `train.py`.**
   Per `ml/CLAUDE.md`'s notebooks rule, this settled logic (windowing, RUL
   labeling, scaling, class weighting) should eventually move into the shared
-  feature builder so `train.py` — and therefore any reproducible CLI-driven
-  retrain — doesn't require re-running the notebook by hand.
+  feature builder so `train.py` doesn't require re-running the notebook.
 - **Digital-twin residuals (`ml/features/fit_digital_twin.py`'s
   `physics_residuals()`) are not fed to this model.** It trains on raw scaled
-  sensor values, not operating-condition-adjusted residuals — see the
-  Step 7 work in the root `CLAUDE.md`/`build_plan.md`. Wiring residuals in as
-  additional features is the highest-leverage remaining improvement
+  sensor values, not operating-condition-adjusted residuals. Wiring residuals
+  in as additional features is the highest-leverage remaining improvement
   identified so far, not yet attempted.
+
+## Next step before using this checkpoint downstream
+
+Given the precision collapse documented above, **this v1 checkpoint's
+sensor-fault head should not be wired into the backend/advisory layer as-is**
+— it will over-alarm on healthy engines. Health and RUL heads are unaffected
+by the sampler change and remain usable. Retraining without the
+`WeightedRandomSampler` (reverting to loss-only class weighting, as in the
+batch-2 run) is the recommended next step before treating sensor-fault
+detection as production-ready.
 
 ## Artifacts
 
-Stored in Google Drive (`/content/drive/MyDrive/DroneAcharaya/ml_artifacts/lstm_rul/`
-when mounted in Colab; adjust for Kaggle's `/kaggle/working/` if trained
-there), **not committed to this repo** (matches `ml/artifacts/` being
-gitignored elsewhere in the project, even though this notebook's outputs
-happen to live in Drive rather than `ml/artifacts/` directly):
+Versioned in `ml/artifacts/lstm_rul/v1/` (gitignored; distribute out of band
+per `ml/artifacts/README.md`):
 
 | File | Contents |
 | --- | --- |
@@ -271,8 +270,10 @@ happen to live in Drive rather than `ml/artifacts/` directly):
 | `scaler.joblib` | Fitted `StandardScaler` for `SENSOR_COLUMNS` (train-split only) |
 | `engine_state_encoder.joblib` | Fitted `OneHotEncoder` for `engine_state` (12 categories) |
 | `rul_scale_seconds.json` | `{"rul_scale_seconds": 3600.0}` — required to convert the model's normalized RUL output back to seconds at inference time |
+| `metadata.json` | Architecture, hyperparameters, metrics, and known issues for this version — read this before loading the checkpoint elsewhere |
 
-All four files are required to reproduce inference outside the notebook —
-see the model architecture section above for the exact `EngineMultiHeadLSTM`
-constructor args (`hidden_size=256, num_layers=3, dropout=0.5`) needed to
-re-instantiate the class before loading `lstm_best.pt`'s `state_dict`.
+All four model files are required to reproduce inference outside the
+notebook — see the architecture section above for the exact
+`EngineMultiHeadLSTM` constructor args (`hidden_size=256, num_layers=3,
+dropout=0.5`) needed to re-instantiate the class before loading
+`lstm_best.pt`'s `state_dict`.
