@@ -13,7 +13,10 @@ from app.core.model_loader import load_model
 #   "health": 1.0 = healthy -> 0.0 = failed (use the worst/minimum column)
 #   "deg":    0.0 = healthy -> 1.0 = failed (invert the worst/maximum column)
 HEALTH_COLUMNS: dict[str, tuple[str, list[str]]] = {
-    "injector_degradation": ("health", ["injector_health_c1", "injector_health_c2", "injector_health_c3", "injector_health_c4"]),
+    "injector_degradation": (
+        "health",
+        ["injector_health_c1", "injector_health_c2", "injector_health_c3", "injector_health_c4"],
+    ),
     "cooling_degradation": ("health", ["cooling_health"]),
     "oil_pump_degradation": ("health", ["oil_pump_health"]),
     "bearing_wear": ("health", ["bearing_health"]),

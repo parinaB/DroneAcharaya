@@ -7,7 +7,6 @@ downstream code, per docs/build_plan.md's Step 9 design.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
