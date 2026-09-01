@@ -51,9 +51,7 @@ class TelemetryRow(Base):
     development don't fail a composite-PK constraint."""
 
     __tablename__ = "telemetry"
-    __table_args__ = (
-        Index("ix_telemetry_run_ts", "run_id", "ts"),
-    )
+    __table_args__ = (Index("ix_telemetry_run_ts", "run_id", "ts"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     run_id: Mapped[str] = mapped_column(ForeignKey("runs.run_id"))
@@ -115,9 +113,7 @@ class ResidualRow(Base):
     twin artifact is loaded yet."""
 
     __tablename__ = "residuals"
-    __table_args__ = (
-        Index("ix_residuals_run_ts", "run_id", "ts"),
-    )
+    __table_args__ = (Index("ix_residuals_run_ts", "run_id", "ts"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     run_id: Mapped[str] = mapped_column(ForeignKey("runs.run_id"))
@@ -135,9 +131,7 @@ class HealthScore(Base):
     the API contract nor this table changes shape when that flips."""
 
     __tablename__ = "health_scores"
-    __table_args__ = (
-        Index("ix_health_scores_run_ts", "run_id", "ts"),
-    )
+    __table_args__ = (Index("ix_health_scores_run_ts", "run_id", "ts"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     run_id: Mapped[str] = mapped_column(ForeignKey("runs.run_id"))
