@@ -81,11 +81,17 @@ app/dashboard/
 The dashboard was implemented from a Claude Design handoff ("AeroTwin
 Dashboard v2"), rebuilt as real React components rather than copied
 structurally, and rebranded AeroTwin → DroneAcharaya. Its telemetry, fault,
-and XAI values are the design's static demo data, not live backend calls:
-`backend/`'s ingestion/inference/advisory/replay modules are still stubs (see
-the repo root `CLAUDE.md`), so there is no live API to wire this to yet. When
-that lands, the dashboard should read through `lib/api-client.ts` like the
-rest of the frontend, following the field names in `lib/types.ts`.
+and XAI values are the design's static demo data, not live backend calls —
+this hasn't been wired up yet, even though the backend now has real
+endpoints to wire it to (`/replay`, `/inference`, `/advisory` — see
+[`backend/CLAUDE.md`](../backend/CLAUDE.md)). That's the concrete next gap:
+this component tree already implies the field shapes the backend needs to
+serve (per-cylinder CHT/EGT, health index, RUL, an anomaly feed, a
+twin-divergence trend) — nothing formal has been written down yet connecting
+them. When it's wired, the dashboard should read through `lib/api-client.ts`
+like the rest of the frontend; `lib/types.ts` still mirrors the older flat
+`data/schema.md` shape, not the backend's actual `EngineFrame`/
+`HealthScoreOut` response shapes, so that'll need reconciling too.
 
 ## Learn more
 
