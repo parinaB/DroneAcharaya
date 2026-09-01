@@ -147,7 +147,7 @@ The preprocessing pipeline includes:
 Two independent XGBoost classifiers were trained with the following configuration:
 
 ```python
-n_estimators = 500          # Maximum boosting rounds
+n_estimators = 500  # Maximum boosting rounds
 max_depth = 8
 learning_rate = 0.05
 subsample = 0.8
