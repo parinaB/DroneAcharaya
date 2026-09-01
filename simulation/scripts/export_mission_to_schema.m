@@ -14,11 +14,13 @@ function [telemetry, groundtruth, meta] = export_mission_to_schema(simOut, profi
 %                     does not yet do staged degradation trajectories (that's
 %                     the per-unit generator, still to come); a healthy run
 %                     just passes every _init default.
-%   .sensor_fault     (optional) struct: .channel (name) and .type (one of
-%                     NONE/BIAS/DRIFT/NOISE/STUCK/DROPOUT), .onset_s. Only
-%                     one corruptible channel supported for now (cht_c3, the
-%                     only channel with a real Xv/Xs split built in
-%                     engine_core.slx). Defaults to NONE if omitted.
+%   .sensor_fault     (optional) struct: .channel ('cht_c3' or
+%                     'vibration_rms_x_bearing_proxy'), .type (one of
+%                     NONE/BIAS/DRIFT/NOISE/STUCK/DROPOUT), .onset_s, .end_s
+%                     (only meaningful for DROPOUT's rectangular window --
+%                     inf for the other types, which stay active from
+%                     .onset_s to the end of the mission). Defaults to NONE
+%                     if omitted.
 %   .export_rate_hz   (optional, default 1) single common export rate for
 %                     the whole table -- see the note below on why this is
 %                     one rate, not the schema's per-field native rates.
@@ -38,8 +40,9 @@ function [telemetry, groundtruth, meta] = export_mission_to_schema(simOut, profi
 
 if ~isfield(meta_in,'export_rate_hz'), meta_in.export_rate_hz = 1; end
 if ~isfield(meta_in,'sensor_fault')
-    meta_in.sensor_fault = struct('channel','none','type','NONE','onset_s',inf);
+    meta_in.sensor_fault = struct('channel','none','type','NONE','onset_s',inf,'end_s',inf);
 end
+if ~isfield(meta_in.sensor_fault,'end_s'), meta_in.sensor_fault.end_s = inf; end
 rate = meta_in.export_rate_hz;
 
 t_end = simOut.get('rpm_out').Time(end);
@@ -94,9 +97,10 @@ battery_voltage_true = resample('batt_voltage_out');
 battery_current_true = resample('batt_current_out');
 alternator_power_true = resample('alt_power_out');
 
-%% ---- Xs (post sensor-fault-corruption) -- currently only cht_c3 is
-%% corruptible (engine_core's built Xv/Xs split); every other channel is
-%% Xs==Xv until more sensor-fault taps exist on other channels ---------------
+%% ---- Xs (post sensor-fault-corruption) -- cht_c3 needs an explicit
+%% Xv/Xs choice here (cht3_out vs cht3_reported_out); every other channel,
+%% including the vibration bearing-proxy (handled below), is Xs==Xv unless
+%% a sensor fault is actually active for that specific channel -------------
 if strcmpi(meta_in.sensor_fault.channel,'cht_c3') && ~strcmpi(meta_in.sensor_fault.type,'NONE')
     cht_c3_reported = resample('cht3_reported_out');
 else
@@ -120,7 +124,16 @@ air_density = resample('air_density_out');
 % that reflects mechanical_vibration/bearing_health faults -- do not treat
 % it as redundant with vibration_rms_x/order_1x, they capture different
 % physical mechanisms (see data/README.md).
+%
+% Also engine_core's second corruptible channel (DROPOUT only -- see
+% sensor_fault handling below): vib_rms_x_out is the POST-dropout-switch
+% signal (NaN during a dropout window), so telemetry uses it directly, but
+% groundtruth needs the separately-logged clean tap (vib_rms_x_true_out,
+% added specifically because vib_rms_x_out is not safe to reuse as "true"
+% once dropout can actually fire -- see docs/sensor_fault_injection_fix_plan.md
+% bug 4) rather than reusing the same corrupted signal for both.
 vib_rms_x_proxy = resample('vib_rms_x_out');
+vib_rms_x_proxy_true = resample('vib_rms_x_true_out');
 vib_order1x_proxy = resample('vib_order1x_out');
 
 engine_id_col = repmat(string(meta_in.engine_id), n, 1);
@@ -157,16 +170,30 @@ for i = 1:numel(health_names)
     health_cols{i} = repmat(meta_in.health.(health_names{i}), n, 1);
 end
 
-sensor_fault_active_cht_c3 = repmat(categorical(string(meta_in.sensor_fault.type)), n, 1);
-sensor_fault_active_cht_c3(t_export < meta_in.sensor_fault.onset_s) = categorical("NONE");
+% Two possible corruptible channels; a unit only ever has ONE active, so the
+% inactive column's label column is always NONE for the whole mission. The
+% persistent types (BIAS/DRIFT/NOISE/STUCK) stay active from onset_s to the
+% end of the mission; DROPOUT is the one rectangular window (onset_s to
+% end_s), everything outside it is NONE even after onset_s.
+active_window = t_export >= meta_in.sensor_fault.onset_s & t_export < meta_in.sensor_fault.end_s;
+active_label = repmat(categorical("NONE"), n, 1);
+active_label(active_window) = categorical(string(meta_in.sensor_fault.type));
+
+sensor_fault_active_cht_c3 = repmat(categorical("NONE"), n, 1);
+sensor_fault_active_vibration_rms_x_bearing_proxy = repmat(categorical("NONE"), n, 1);
+if strcmpi(meta_in.sensor_fault.channel,'cht_c3')
+    sensor_fault_active_cht_c3 = active_label;
+elseif strcmpi(meta_in.sensor_fault.channel,'vibration_rms_x_bearing_proxy')
+    sensor_fault_active_vibration_rms_x_bearing_proxy = active_label;
+end
 
 gt_vars = [{t_export, rpm_true, torque_true, cht_c1_true, cht_c2_true, cht_c3_true, cht_c4_true, ...
     egt_c1_true, egt_c2_true, egt_c3_true, egt_c4_true, oil_pressure_true, oil_temperature_true, ...
     fuel_flow_true, rail_pressure_true, injection_timing_true, boost_pressure_true, map_true, ...
     intake_temperature_true, air_mass_flow_true, coolant_temperature_true, ...
-    vib_rms_x, vib_ord1x, vib_rms_x_proxy, vib_order1x_proxy, ...  % vibration_rms_y/z_true not modeled (no y/z axis in the sidecar yet)
+    vib_rms_x, vib_ord1x, vib_rms_x_proxy_true, vib_order1x_proxy, ...  % vibration_rms_y/z_true not modeled (no y/z axis in the sidecar yet)
     battery_voltage_true, battery_current_true, alternator_power_true}, ...
-    health_cols, {sensor_fault_active_cht_c3, imep_cov, vib_ord2x}];
+    health_cols, {sensor_fault_active_cht_c3, sensor_fault_active_vibration_rms_x_bearing_proxy, imep_cov, vib_ord2x}];
 gt_names = [{'t','rpm_true','torque_true','cht_c1_true','cht_c2_true','cht_c3_true','cht_c4_true', ...
     'egt_c1_true','egt_c2_true','egt_c3_true','egt_c4_true','oil_pressure_true','oil_temperature_true', ...
     'fuel_flow_true','rail_pressure_true','injection_timing_true','boost_pressure_true','map_true', ...
@@ -174,7 +201,8 @@ gt_names = [{'t','rpm_true','torque_true','cht_c1_true','cht_c2_true','cht_c3_tr
     'vibration_rms_x_true','vibration_order_1x_true', ...
     'vibration_rms_x_bearing_proxy_true','vibration_order_1x_bearing_proxy_true', ...
     'battery_voltage_true','battery_current_true','alternator_power_true'}, ...
-    health_names', {'sensor_fault_active_cht_c3','imep_cov_c1','vibration_order_2x_true'}];
+    health_names', {'sensor_fault_active_cht_c3','sensor_fault_active_vibration_rms_x_bearing_proxy', ...
+    'imep_cov_c1','vibration_order_2x_true'}];
 
 groundtruth = table(gt_vars{:}, 'VariableNames', gt_names);
 

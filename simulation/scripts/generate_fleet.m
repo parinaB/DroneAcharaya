@@ -109,14 +109,56 @@ for fc = 1:numel(fault_classes)
             u.n_missions = randi(opts.n_missions_range);
 
             % Independent sensor-fault draw (per build_plan.md: drawn
-            % independently of both physical fault and shape). Only cht_c3
-            % is corruptible right now (engine_core's one real Xv/Xs split).
+            % independently of both physical fault and shape). Two
+            % corruptible channels exist: cht_c3 (BIAS/DRIFT/NOISE/STUCK --
+            % engine_core's Xv/Xs Sum+Switch chain) and
+            % vibration_rms_x_bearing_proxy (DROPOUT -- a separate
+            % Switch+NaN mechanism; a dropout demo on cht_c3 would be
+            % indistinguishable from stuck given cht_c1's own hold_last
+            % missing-value policy, per AeroDieselEngineParameters.m).
             sf_types = {'NONE','BIAS','DRIFT','NOISE','STUCK','DROPOUT'};
-            u.sensor_fault_channel = 'cht_c3';
             u.sensor_fault_type = sf_types{randi(numel(sf_types))};
+            if strcmp(u.sensor_fault_type, 'DROPOUT')
+                u.sensor_fault_channel = 'vibration_rms_x_bearing_proxy';
+            else
+                u.sensor_fault_channel = 'cht_c3';
+            end
+
+            % Onset must fall inside THIS unit's own actual lifetime, not a
+            % flat range -- estimated from n_missions x this shape's
+            % empirical average duration (see
+            % docs/sensor_fault_injection_fix_plan.md for the full
+            % derivation and why a flat 10-200h draw never fired against
+            % real unit lifetimes of ~2-14h). Per-type because they have
+            % genuinely different onset semantics, confirmed against the
+            % actual .slx wiring: DRIFT is a plain Ramp block that resets to
+            % zero every mission (no persisted state across sim() calls),
+            % so it needs onset early enough that at least one WHOLE later
+            % mission gets onset_s=0 (full mission duration to ramp) rather
+            % than just "sometime in the unit's life". BIAS/NOISE/STUCK are
+            % instant-onset (full severity immediately), so a broader
+            % window works. DROPOUT is a short rectangular on/off window,
+            % not an onset-hours phenomenon at all -- it gets its own
+            % start/duration fields, applied within whichever mission
+            % straddles its onset point.
+            avg_duration_h = containers.Map( ...
+                {'hot_day_ground_ops','high_throttle_climb_heavy','short_patrol', ...
+                 'high_altitude_transit','long_loiter'}, ...
+                {0.266, 0.289, 0.391, 0.947, 1.370});
+            est_total_hours = u.n_missions * avg_duration_h(u.mission_shape);
+
             u.sensor_fault_onset_hours = NaN;
+            u.sensor_fault_dropout_duration_s = NaN;
             if ~strcmp(u.sensor_fault_type,'NONE')
-                u.sensor_fault_onset_hours = 10 + 190*rand();
+                switch u.sensor_fault_type
+                    case 'DRIFT'
+                        u.sensor_fault_onset_hours = 0.1*est_total_hours + 0.2*est_total_hours*rand();
+                    case 'DROPOUT'
+                        u.sensor_fault_onset_hours = 0.2*est_total_hours + 0.6*est_total_hours*rand();
+                        u.sensor_fault_dropout_duration_s = 30 + 90*rand(); % 30-120s window
+                    otherwise % BIAS, NOISE, STUCK
+                        u.sensor_fault_onset_hours = 0.2*est_total_hours + 0.6*est_total_hours*rand();
+                end
             end
 
             if isempty(fleet), fleet = u; else, fleet(end+1) = u; end %#ok<AGROW>
