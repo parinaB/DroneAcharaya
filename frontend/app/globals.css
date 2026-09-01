@@ -24,3 +24,147 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Dashboard (Live Dashboard / Simulation): dark digital-twin UI. */
+.dt-root ::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+.dt-root ::-webkit-scrollbar-track {
+  background: #0b0d0f;
+}
+.dt-root ::-webkit-scrollbar-thumb {
+  background: #262b30;
+  border-radius: 6px;
+}
+.dt-root ::-webkit-scrollbar-thumb:hover {
+  background: #363d44;
+}
+.dt-root a {
+  color: #4fb391;
+  text-decoration: none;
+}
+.dt-root a:hover {
+  color: #7fcbb0;
+}
+@keyframes dt-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+.dt-pulse {
+  animation: dt-pulse 1.3s ease-in-out infinite;
+}
+.dt-nav-item,
+.dt-tab,
+.dt-btn-ghost,
+.dt-btn-danger,
+.dt-btn-play {
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.12s ease,
+    opacity 0.18s ease;
+}
+.dt-nav-item:hover {
+  background: #161b1f;
+  color: #e8ebed;
+}
+.dt-nav-item:active {
+  transform: scale(0.985);
+}
+.dt-tab:hover {
+  filter: brightness(1.18);
+}
+.dt-tab:active {
+  transform: scale(0.94);
+}
+.dt-scenario-card:hover {
+  transform: translateX(2px);
+}
+.dt-btn-ghost:hover {
+  background: #171c20;
+  transform: translateY(-1px);
+}
+.dt-btn-ghost:active {
+  transform: translateY(0) scale(0.97);
+}
+.dt-btn-danger:hover {
+  background: #ff6a5c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(255, 77, 61, 0.28);
+}
+.dt-btn-danger:active {
+  transform: translateY(0) scale(0.97);
+}
+.dt-btn-play:hover {
+  background: #ffffff;
+  transform: translateY(-1px);
+}
+.dt-btn-play:active {
+  transform: translateY(0) scale(0.94);
+}
+
+/* Sliders: native accent-color styling stays, just add tactile feedback. */
+.dt-slider {
+  transition:
+    filter 0.15s ease,
+    transform 0.1s ease;
+}
+.dt-slider:hover {
+  filter: brightness(1.25);
+}
+.dt-slider:active {
+  transform: scaleY(1.6);
+}
+
+/* Screen switch (Live Dashboard <-> Simulation) entrance. */
+@keyframes dt-screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.dt-screen-enter {
+  animation: dt-screen-in 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Camera-view label swap in the simulation viewport. */
+@keyframes dt-fade-swap {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.dt-fade-swap {
+  animation: dt-fade-swap 0.25s ease;
+}
+
+/* Boot / loading screen. */
+@keyframes dt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.dt-loading-spin {
+  animation: dt-spin 0.9s linear infinite;
+}
+.dt-loading {
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+.dt-loading-exit {
+  opacity: 0;
+}

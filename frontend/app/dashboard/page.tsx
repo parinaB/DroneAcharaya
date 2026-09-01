@@ -1,10 +1,127 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Sidebar } from "./_components/Sidebar";
+import { TopBar } from "./_components/TopBar";
+import { LiveDashboard } from "./_components/LiveDashboard";
+import { SimulationView } from "./_components/SimulationView";
+import { LoadingScreen } from "./_components/LoadingScreen";
+import { hms } from "./_lib/format";
+import { color } from "./_lib/tokens";
+import {
+  DEFAULT_SIM_PARAMS,
+  SIM_RUN_LENGTH,
+  type Camera,
+  type Role,
+  type Screen,
+  type SimParams,
+  type XaiTab,
+} from "./_lib/state";
+
+/** Mission elapsed time is a fixed demo value; the design mock doesn't tick it. */
+const MISSION_ELAPSED_SECONDS = 6146;
+
 export default function DashboardPage() {
+  const [booting, setBooting] = useState(true);
+
+  const [screen, setScreen] = useState<Screen>("dashboard");
+  const [role, setRole] = useState<Role>("operator");
+  const [acknowledged, setAcknowledged] = useState(false);
+
+  const [playing, setPlaying] = useState(true);
+  const [speed, setSpeed] = useState(2);
+  const [t, setT] = useState(5306);
+  const [scenario, setScenario] = useState(1);
+  const [camera, setCamera] = useState<Camera>("eng");
+  const [xai, setXai] = useState<XaiTab>("drivers");
+  const [fullscreen, setFullscreen] = useState(false);
+  const [params, setParams] = useState<SimParams>(DEFAULT_SIM_PARAMS);
+
+  useEffect(() => {
+    if (!playing) return;
+    const id = setInterval(() => {
+      setT((prev) => (prev + speed) % SIM_RUN_LENGTH);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [playing, speed]);
+
+  const openPrediction = () => {
+    setScreen("simulation");
+    setScenario(1);
+    setXai("drivers");
+  };
+  const whyThisPrediction = () => {
+    setScreen("simulation");
+    setScenario(1);
+    setXai("reasoning");
+  };
+
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold">Live Health Dashboard</h1>
-      <p className="mt-2 text-sm opacity-70">
-        Placeholder — real-time gauges, trend charts and alert cards land here.
-      </p>
-    </main>
+    <>
+      {booting && <LoadingScreen onDone={() => setBooting(false)} />}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+      <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet"
+      />
+      <div
+        className="dt-root"
+        style={{
+          display: "flex",
+          height: "100vh",
+          minHeight: 800,
+          width: "100%",
+          minWidth: 1280,
+          overflow: "hidden",
+          background: color.bg,
+          color: color.text,
+          fontFamily: "Archivo, Helvetica, Arial, sans-serif",
+          WebkitFontSmoothing: "antialiased",
+          opacity: booting ? 0 : 1,
+          transition: "opacity 500ms ease",
+        }}
+      >
+        <Sidebar screen={screen} onScreenChange={setScreen} />
+
+        <main style={{ flex: "1 1 auto", display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
+          <TopBar screen={screen} role={role} onRoleChange={setRole} missionClock={hms(MISSION_ELAPSED_SECONDS)} />
+
+          <div key={screen} className="dt-screen-enter" style={{ flex: "1 1 auto", display: "flex", minHeight: 0 }}>
+            {screen === "dashboard" ? (
+              <LiveDashboard
+                acknowledged={acknowledged}
+                onAcknowledge={() => setAcknowledged((a) => !a)}
+                onOpenPrediction={openPrediction}
+                onWhyThisPrediction={whyThisPrediction}
+              />
+            ) : (
+              <SimulationView
+                scenario={scenario}
+                onScenarioChange={setScenario}
+                params={params}
+                onParamsChange={setParams}
+                onResetParams={() => setParams(DEFAULT_SIM_PARAMS)}
+                playing={playing}
+                onTogglePlay={() => setPlaying((p) => !p)}
+                speed={speed}
+                onSpeedChange={setSpeed}
+                t={t}
+                onSeek={(next) => {
+                  setPlaying(false);
+                  setT(next);
+                }}
+                camera={camera}
+                onCameraChange={setCamera}
+                xai={xai}
+                onXaiChange={setXai}
+                fullscreen={fullscreen}
+                onToggleFullscreen={() => setFullscreen((f) => !f)}
+              />
+            )}
+          </div>
+        </main>
+      </div>
+    </>
   );
 }
