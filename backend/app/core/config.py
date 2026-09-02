@@ -22,9 +22,19 @@ class Settings(BaseSettings):
     # Origins allowed to call this API (the Next.js dev server by default).
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
-    # Filesystem roots. Defaults resolve relative to the repository root.
+    # Filesystem roots. Defaults resolve relative to the repository root
+    # (i.e. assume CWD is backend/, per `cd backend && uvicorn ...`).
     artifacts_dir: Path = Path("../ml/artifacts")
     data_dir: Path = Path("../data")
+
+    # Which ml/artifacts/lstm_rul/<version> to load. Bump when a new
+    # checkpoint replaces v1 -- see ml/artifacts/lstm_rul/v1/metadata.json.
+    lstm_rul_version: str = "v1"
+
+    # Which ml/artifacts/xgboost_classifier/<version> to load. Bump when a
+    # new pair of models replaces v1 -- see
+    # ml/artifacts/xgboost_classifier/v1/metadata.json.
+    xgboost_classifier_version: str = "v1"
 
     # Defaults to a local SQLite file so `uvicorn app.main:app --reload`
     # works with zero setup. Production points this at Supabase's Postgres

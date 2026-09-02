@@ -58,6 +58,10 @@ def write_health_score(
     rul_upper: float | None,
     source: str,
     model_version: str | None,
+    forecast_horizon_s: float = 0.0,
+    sensor_fault_cht_c3: str | None = None,
+    sensor_fault_bearing_vibration: str | None = None,
+    sensor_fault_model_version: str | None = None,
 ) -> HealthScore:
     row = HealthScore(
         run_id=run_id,
@@ -72,6 +76,10 @@ def write_health_score(
         rul_upper=rul_upper,
         source=source,
         model_version=model_version,
+        forecast_horizon_s=forecast_horizon_s,
+        sensor_fault_cht_c3=sensor_fault_cht_c3,
+        sensor_fault_bearing_vibration=sensor_fault_bearing_vibration,
+        sensor_fault_model_version=sensor_fault_model_version,
     )
     db.add(row)
     db.commit()

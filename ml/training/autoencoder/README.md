@@ -1,11 +1,12 @@
 # Autoencoder — unsupervised anomaly detection
 
-**Status: training in progress**, in `autoencoder_training.ipynb`, off
+**Status: v3 trained**, in `autoencoder_training.ipynb`, off
 `ml/notebooks/DroneAcharaya_Preprocessing.ipynb`'s output (see
 `../README.md`'s "What the preprocessing notebook outputs" section for the
 exact input it consumes — `merged_df`, healthy-filtered, per-timestep, not
-the windowed arrays). No artifact/metrics to report yet; `train.py` below is
-still the CLI-stub path, not what's actually being run right now.
+the windowed arrays). Artifacts and metrics are in
+`ml/artifacts/autoencoder/v3/` — see [Results](#results) below. `train.py`
+below is still the CLI-stub path, not what's actually being run.
 
 Learns to reconstruct **nominal** engine behaviour. At inference, reconstruction
 error becomes an anomaly score; a sustained rise flags "something is wrong"
@@ -58,3 +59,36 @@ threshold selection and reporting only, never for weight updates).
 **Detection latency** (time from `fault_onset` to sustained correct
 detection) is not computed yet — a v2 addition once this is being evaluated
 per fault class rather than as one pooled row-level metric.
+
+## Results (v3, `ml/artifacts/autoencoder/v3/`)
+
+Hyperparameters: `latent_dim=8`, `epochs=100`, `batch_size=256`, `lr=1e-3`.
+Trained on 96 healthy holdout runs (`ae_run_pool="twin-holdout"`, disjoint
+from `digital_twin`'s own fit runs), 11 held out further as a dev set for
+threshold selection, evaluated on the full 375-run validation split.
+
+| Metric | Value |
+| --- | --- |
+| Best dev reconstruction MSE | 0.0427 |
+| Validation reconstruction MSE (healthy rows) | 0.0614 |
+| Validation ROC-AUC | 0.828 |
+| Anomaly threshold | 0.1837 (95th percentile of dev-set reconstruction error) |
+| False-alarm rate | 5.0% |
+| Detection rate | 62.9% |
+
+A 0.629 detection rate at a 0.05 false-alarm rate is a reasonable but not
+strong operating point — roughly 1 in 3 genuinely faulted rows go
+undetected at this threshold. Since this is a row-level metric (no temporal
+smoothing/sustained-detection logic yet), the operational detection rate for
+"did the system ever flag this run before failure" is likely higher than
+62.9% suggests, but that hasn't been measured — see the detection-latency
+gap noted above. Full per-row predictions (including `ae_recon_error`,
+`ae_anomaly_flag`, and each channel's own `ae_error__*` breakdown) are saved
+in `validation_predictions.csv` for further analysis.
+
+**Known gap**: `metadata.json` references `ml/artifacts/digital_twin/v3` as
+the fitted digital-twin models this autoencoder's residual features depend
+on, but that directory is not present in this repo — only the autoencoder's
+own output was copied over. Anyone needing to reproduce or extend the
+residual features (rather than just load this trained autoencoder) will
+need those `digital_twin/v3` artifacts too.

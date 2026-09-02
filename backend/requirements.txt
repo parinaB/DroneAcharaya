@@ -5,9 +5,15 @@ pydantic
 pydantic-settings
 numpy
 pandas
-scikit-learn
+# Pinned to the version ml/artifacts/lstm_rul/v1's scaler.joblib/
+# engine_state_encoder.joblib were pickled with (see model_loader.py) --
+# a version drift here is a silent-wrong-predictions risk, not just a
+# deprecation warning, since sklearn's pickle format isn't guaranteed
+# stable across versions.
+scikit-learn==1.6.1
 xgboost
 torch
+joblib
 shap
 python-multipart
 

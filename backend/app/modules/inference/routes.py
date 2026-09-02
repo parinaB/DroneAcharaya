@@ -21,7 +21,7 @@ async def latest_health_score(
     db: Session = Depends(get_db),
 ) -> HealthScore:
     row = db.execute(
-        select(HealthScore).where(HealthScore.session_id == session_id).order_by(HealthScore.id.desc())
+        select(HealthScore).where(HealthScore.session_id == session_id).order_by(HealthScore.id.desc()).limit(1)
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail=f"no health score written yet for session {session_id!r}")
