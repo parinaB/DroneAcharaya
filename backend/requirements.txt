@@ -7,7 +7,15 @@ numpy
 pandas
 scikit-learn
 xgboost
-torch
+
+# CPU-only build: this is a serving API, not a training environment (see
+# ml/CLAUDE.md's Commands section for GPU training). Unpinned `torch` pulls
+# PyPI's default CUDA-bundled wheel plus its full nvidia-*/cuda-toolkit
+# dependency chain (several GB), which has been enough to exhaust CI runner
+# disk space outright. The CPU wheel is ~200MB and installs cleanly.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.0+cpu
+
 shap
 python-multipart
 
