@@ -32,7 +32,12 @@ from app.core.model_loader import LSTM_SEQ_LEN, XGB_ROLLING_WINDOW
 from app.db.base import SessionLocal
 from app.db.writer import ensure_run, write_health_score, write_telemetry
 from app.modules.inference.ground_truth import GroundTruthLookup
-from app.modules.inference.service import get_health_score, try_load_lstm_bundle, try_load_xgboost_bundle
+from app.modules.inference.service import (
+    get_health_score,
+    try_load_autoencoder_bundle,
+    try_load_lstm_bundle,
+    try_load_xgboost_bundle,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +72,7 @@ class BridgeService:
         settings = get_settings()
         self._lstm_bundle = try_load_lstm_bundle(str(settings.artifacts_dir), settings.lstm_rul_version)
         self._xgb_bundle = try_load_xgboost_bundle(str(settings.artifacts_dir), settings.xgboost_classifier_version)
+        self._ae_bundle = try_load_autoencoder_bundle(str(settings.artifacts_dir), settings.autoencoder_version)
         # Shared buffer: lstm_rul needs the full LSTM_SEQ_LEN window;
         # xgboost_classifier is row-level but its rolling features need
         # history too, gated separately below on the shorter XGB_ROLLING_WINDOW.
@@ -107,6 +113,8 @@ class BridgeService:
                     lstm_window=list(self._frame_window) if lstm_ready else None,
                     xgb_bundle=self._xgb_bundle if xgb_ready else None,
                     xgb_window=list(self._frame_window) if xgb_ready else None,
+                    ae_bundle=self._ae_bundle,
+                    ae_frame=frame if self._ae_bundle is not None else None,
                 )
                 write_health_score(
                     db,

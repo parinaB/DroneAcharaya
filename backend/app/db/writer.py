@@ -62,6 +62,9 @@ def write_health_score(
     sensor_fault_cht_c3: str | None = None,
     sensor_fault_bearing_vibration: str | None = None,
     sensor_fault_model_version: str | None = None,
+    anomaly_score: float | None = None,
+    is_anomalous: bool | None = None,
+    anomaly_model_version: str | None = None,
 ) -> HealthScore:
     row = HealthScore(
         run_id=run_id,
@@ -80,6 +83,9 @@ def write_health_score(
         sensor_fault_cht_c3=sensor_fault_cht_c3,
         sensor_fault_bearing_vibration=sensor_fault_bearing_vibration,
         sensor_fault_model_version=sensor_fault_model_version,
+        anomaly_score=anomaly_score,
+        is_anomalous=is_anomalous,
+        anomaly_model_version=anomaly_model_version,
     )
     db.add(row)
     db.commit()

@@ -16,8 +16,10 @@ it trades exact reproducibility of the notebook's validation run for being
 able to serve predictions at all without the missing artifacts. The
 engine_state one-hot category list below is reconstructed from the
 notebook's own printed cell output, not re-derived from a fitted encoder.
-autoencoder is not loaded yet (missing digital_twin dependency) -- see
-ml/artifacts/autoencoder/v3/metadata.json for what it blocks on.
+autoencoder is now wired: ml/artifacts/digital_twin/v3/ (27 per-channel
+regressors + metadata.json) has been provided, unblocking
+ml/artifacts/autoencoder/v3/, which is paired with it (see that model's
+README -- v3 autoencoder + v3 digital twin only, never mixed with v1).
 """
 
 from __future__ import annotations
@@ -42,10 +44,18 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from ml.training.autoencoder.train import TelemetryAutoencoder  # noqa: E402
 from ml.training.lstm_rul.model import EngineMultiHeadLSTM  # noqa: E402
 
 LSTM_SEQ_LEN = 60
 LSTM_FORECAST_HORIZON_S = 60.0
+
+# Autoencoder is row-level (no rolling window) -- see ml/training/autoencoder/
+# README.md. Gated on the same transient states physics_residuals() itself
+# gates to NaN (ml/features/feature_engineering.py's _GATED_OUT_STATES) --
+# scoring a transient row would just teach the anomaly score to associate
+# normal startup/shutdown with a fault.
+AE_GATED_STATES = {"STARTING", "SHUTDOWN", "THROTTLE_TRANSIENT"}
 
 # ml/training/xgboost_classifier/xgboost_training.ipynb's SENSOR_COLUMNS --
 # identical list/order to lstm_rul's, see cell 8 of that notebook.
@@ -150,6 +160,28 @@ class ModelArtifactError(Exception):
     """Raised when an artifact directory is missing or malformed -- distinct
     from NotImplementedError so callers can tell "not built yet" apart from
     "should exist but doesn't"."""
+
+
+@dataclass(frozen=True)
+class AutoencoderBundle:
+    """Everything needed to score one telemetry row's reconstruction error:
+    the model, its fitted scaler (plain JSON, not sklearn -- see this
+    module's docstring), the anomaly threshold, and the digital-twin
+    directory physics_residuals() needs to compute this row's residual
+    features. residual_columns/condition_features/engine_state_categories
+    fix the exact feature order the model was trained on."""
+
+    model: TelemetryAutoencoder
+    scaler_mean: Any  # np.ndarray, aligned to scale_columns
+    scaler_std: Any  # np.ndarray, aligned to scale_columns
+    scale_columns: list[str]  # residual_columns + condition_features, scaler fit order
+    feature_columns: list[str]  # full model input order: scale_columns + engine_state one-hot
+    residual_columns: list[str]
+    condition_features: list[str]
+    engine_state_categories: list[str]
+    threshold: float
+    digital_twin_dir: str
+    version: str
 
 
 @dataclass(frozen=True)
@@ -259,17 +291,77 @@ def load_xgboost_classifier_bundle(artifacts_dir: str, version: str = "v1") -> X
     return XgboostClassifierBundle(cht_c3_model=cht_c3_model, bearing_model=bearing_model, version=version)
 
 
+@lru_cache(maxsize=4)
+def load_autoencoder_bundle(artifacts_dir: str, version: str = "v3") -> AutoencoderBundle:
+    """Load the autoencoder + its plain-JSON scaler/threshold from
+    ``{artifacts_dir}/autoencoder/{version}/``. Cached per (artifacts_dir,
+    version) pair.
+
+    Raises:
+        ModelArtifactError: the version directory, a required file, or its
+            paired digital_twin directory is missing.
+    """
+    version_dir = Path(artifacts_dir) / "autoencoder" / version
+    if not version_dir.is_dir():
+        raise ModelArtifactError(f"autoencoder artifact directory not found: {version_dir}")
+
+    metadata_path = version_dir / "metadata.json"
+    model_path = version_dir / "model.pt"
+    scaler_path = version_dir / "scaler.json"
+    threshold_path = version_dir / "threshold.json"
+    for path in (metadata_path, model_path, scaler_path, threshold_path):
+        if not path.exists():
+            raise ModelArtifactError(f"autoencoder artifact missing required file: {path}")
+
+    metadata = json.loads(metadata_path.read_text())
+    scaler = json.loads(scaler_path.read_text())
+    threshold = json.loads(threshold_path.read_text())["threshold"]
+
+    # digital_twin_artifacts_dir in metadata.json is repo-root-relative
+    # (e.g. "ml/artifacts/digital_twin/v3"); physics_residuals() needs the
+    # matching twin's regressors to compute this row's residuals -- pairing
+    # the wrong twin with this autoencoder silently produces garbage (see
+    # ml/training/autoencoder/README.md's "Digital twin" section).
+    digital_twin_dir = _REPO_ROOT / metadata["digital_twin_artifacts_dir"]
+    if not (digital_twin_dir / "metadata.json").exists():
+        raise ModelArtifactError(f"autoencoder's paired digital_twin directory not found: {digital_twin_dir}")
+
+    model = TelemetryAutoencoder(
+        input_dim=len(metadata["feature_columns"]),
+        latent_dim=metadata["hyperparameters"]["latent_dim"],
+    )
+    state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
+    model.load_state_dict(state_dict)
+    model.eval()
+
+    return AutoencoderBundle(
+        model=model,
+        scaler_mean=scaler["mean"],
+        scaler_std=scaler["std"],
+        scale_columns=scaler["columns"],
+        feature_columns=metadata["feature_columns"],
+        residual_columns=metadata["residual_columns"],
+        condition_features=metadata["condition_features"],
+        engine_state_categories=metadata["engine_state_categories"],
+        threshold=threshold,
+        digital_twin_dir=str(digital_twin_dir),
+        version=version,
+    )
+
+
 def load_model(artifact_path: str | Path) -> Any:
     """Load a serialised model artifact from ``ml/artifacts/`` and return it.
 
     Only ``"digital_twin"`` remains unimplemented (still raises
-    ``NotImplementedError``) -- ``"lstm_rul"`` and ``"xgboost_classifier"``
-    dispatch to :func:`load_lstm_rul_bundle` / :func:`load_xgboost_classifier_bundle`.
-    Callers that need to run real preprocessing (not just hold a model
-    reference) should call those functions directly instead of going through
-    this generic entrypoint -- xgboost_classifier's bundle has no
-    scaler/encoder to hide behind this signature anyway (see this module's
-    docstring for why).
+    ``NotImplementedError`` -- it's consumed as a dependency of
+    ``physics_residuals()``/the autoencoder, not loaded standalone via this
+    entrypoint). ``"lstm_rul"``, ``"xgboost_classifier"`` and ``"autoencoder"``
+    dispatch to :func:`load_lstm_rul_bundle` / :func:`load_xgboost_classifier_bundle`
+    / :func:`load_autoencoder_bundle`. Callers that need to run real
+    preprocessing (not just hold a model reference) should call those
+    functions directly instead of going through this generic entrypoint --
+    xgboost_classifier's bundle has no scaler/encoder to hide behind this
+    signature anyway (see this module's docstring for why).
 
     Args:
         artifact_path: Path to the artifact, absolute or relative to
@@ -290,5 +382,9 @@ def load_model(artifact_path: str | Path) -> Any:
     if str(artifact_path) == "xgboost_classifier":
         settings = get_settings()
         return load_xgboost_classifier_bundle(str(settings.artifacts_dir))
+
+    if str(artifact_path) == "autoencoder":
+        settings = get_settings()
+        return load_autoencoder_bundle(str(settings.artifacts_dir))
 
     raise NotImplementedError(f"Model artifact loading not implemented yet for {artifact_path!r}.")

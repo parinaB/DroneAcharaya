@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     # ml/artifacts/xgboost_classifier/v1/metadata.json.
     xgboost_classifier_version: str = "v1"
 
+    # Which ml/artifacts/autoencoder/<version> to load. Must stay paired with
+    # the matching ml/artifacts/digital_twin/<version> (v3 with v3, never
+    # mixed) -- see ml/training/autoencoder/README.md.
+    autoencoder_version: str = "v3"
+
     # Defaults to a local SQLite file so `uvicorn app.main:app --reload`
     # works with zero setup. Production points this at Supabase's Postgres
     # connection-pooler string via the DATABASE_URL env var / backend/.env

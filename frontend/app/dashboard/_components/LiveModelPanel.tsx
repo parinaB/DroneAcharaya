@@ -15,6 +15,9 @@
  * sensor_fault_bearing_vibration come from xgboost_classifier separately
  * (fills in ~10 frames in, well before lstm_rul's fields do) and use a
  * DIFFERENT class vocabulary from fault_type -- never conflated in this UI.
+ * anomaly_score/is_anomalous come from the autoencoder, a THIRD independent
+ * signal (row-level, no window) -- "is something generally off" rather than
+ * naming a fault or sensor.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -120,7 +123,7 @@ export function LiveModelPanel() {
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <span style={{ color: color.textLabel, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-          Live model output (lstm_rul + xgboost_classifier)
+          Live model output (lstm_rul + xgboost_classifier + autoencoder)
         </span>
         {state.phase === "running" ? (
           <button onClick={stop} style={buttonStyle}>
@@ -177,6 +180,18 @@ export function LiveModelPanel() {
             }
           />
           <Field label="Sensor-fault source" value={health?.sensor_fault_model_version ?? "—"} />
+
+          <Field
+            label="Anomaly score (autoencoder)"
+            value={health?.anomaly_score !== null && health?.anomaly_score !== undefined ? health.anomaly_score.toFixed(4) : "—"}
+            highlight={health?.is_anomalous === true}
+          />
+          <Field
+            label="Anomalous?"
+            value={health?.is_anomalous === null || health?.is_anomalous === undefined ? "—" : health.is_anomalous ? "yes" : "no"}
+            highlight={health?.is_anomalous === true}
+          />
+          <Field label="Anomaly source" value={health?.anomaly_model_version ?? "—"} />
           <div />
         </div>
       )}

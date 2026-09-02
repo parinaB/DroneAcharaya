@@ -36,3 +36,11 @@ class HealthScoreOut(BaseModel):
     sensor_fault_cht_c3: str | None = None
     sensor_fault_bearing_vibration: str | None = None
     sensor_fault_model_version: str | None = None
+    # autoencoder's reconstruction-error anomaly signal -- independent of
+    # fault_type/sensor_fault_* above (a third, additive vocabulary: "is
+    # something generally off" rather than "which fault" or "which sensor").
+    # None until this frame's engine_state is scoreable (not a gated
+    # transient) and an autoencoder artifact is loaded.
+    anomaly_score: float | None = None
+    is_anomalous: bool | None = None
+    anomaly_model_version: str | None = None

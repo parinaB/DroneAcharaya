@@ -18,9 +18,11 @@ from app.core.model_loader import (
     LSTM_FORECAST_HORIZON_S,
     XGB_BEARING_ID_TO_CLASS,
     XGB_CHT_C3_ID_TO_CLASS,
+    AutoencoderBundle,
     LstmRulBundle,
     ModelArtifactError,
     XgboostClassifierBundle,
+    load_autoencoder_bundle,
     load_lstm_rul_bundle,
     load_xgboost_classifier_bundle,
 )
@@ -147,6 +149,32 @@ def xgboost_sensor_fault_score(bundle: XgboostClassifierBundle, window: list) ->
     }
 
 
+def autoencoder_anomaly_score(bundle: AutoencoderBundle, frame) -> dict:
+    """Returns the three anomaly_* fields from the autoencoder's
+    reconstruction error on one telemetry frame. Row-level -- no rolling
+    window needed, unlike lstm_rul/xgboost_classifier -- but returns all-None
+    if the frame's engine_state is a gated transient or a needed channel is
+    NaN (see autoencoder_features.py's build_autoencoder_features)."""
+    import torch
+
+    from app.modules.inference.autoencoder_features import build_autoencoder_features
+
+    x = build_autoencoder_features(bundle, frame)
+    if x is None:
+        return {"anomaly_score": None, "is_anomalous": None, "anomaly_model_version": None}
+
+    with torch.no_grad():
+        x_t = torch.from_numpy(x)
+        reconstruction = bundle.model(x_t)
+        error = torch.mean((reconstruction - x_t) ** 2).item()
+
+    return {
+        "anomaly_score": round(error, 6),
+        "is_anomalous": error > bundle.threshold,
+        "anomaly_model_version": f"autoencoder/{bundle.version}",
+    }
+
+
 def get_health_score(
     fault_class: str,
     groundtruth_row: dict | None,
@@ -155,6 +183,8 @@ def get_health_score(
     lstm_window: list | None = None,
     xgb_bundle: XgboostClassifierBundle | None = None,
     xgb_window: list | None = None,
+    ae_bundle: AutoencoderBundle | None = None,
+    ae_frame=None,
 ) -> dict:
     """Returns the fields HealthScoreOut/HealthScore need, minus run_id/t
     (the caller already has those).
@@ -164,10 +194,11 @@ def get_health_score(
     otherwise falls through to the ground-truth stand-in (early frames of a
     session, before the rolling window has filled, or any source with no
     ground truth and no model). xgboost_classifier's sensor_fault_* fields
-    are computed independently of that choice (when `xgb_bundle`/`xgb_window`
-    are both provided) and merged into whichever base result applies --
-    they're an additive signal, not an alternative source for the same
-    fields as fault_type/health_index/rul_estimate_hours.
+    and the autoencoder's anomaly_* fields are each computed independently
+    of that choice (when their bundle/window-or-frame args are both
+    provided) and merged into whichever base result applies -- they're
+    additive signals, not alternative sources for the same fields as
+    fault_type/health_index/rul_estimate_hours.
     """
     if lstm_bundle is not None and lstm_window is not None:
         import torch
@@ -232,6 +263,12 @@ def get_health_score(
                 "sensor_fault_model_version": None,
             }
         )
+
+    if ae_bundle is not None and ae_frame is not None:
+        result.update(autoencoder_anomaly_score(ae_bundle, ae_frame))
+    else:
+        result.update({"anomaly_score": None, "is_anomalous": None, "anomaly_model_version": None})
+
     return result
 
 
@@ -250,5 +287,14 @@ def try_load_xgboost_bundle(artifacts_dir: str, version: str = "v1") -> XgboostC
     directory doesn't exist yet."""
     try:
         return load_xgboost_classifier_bundle(artifacts_dir, version)
+    except ModelArtifactError:
+        return None
+
+
+def try_load_autoencoder_bundle(artifacts_dir: str, version: str = "v3") -> AutoencoderBundle | None:
+    """Best-effort load -- returns None (not an exception) if the artifact
+    directory or its paired digital_twin directory doesn't exist yet."""
+    try:
+        return load_autoencoder_bundle(artifacts_dir, version)
     except ModelArtifactError:
         return None

@@ -12,10 +12,10 @@ actually built here and the conventions for extending it.
 | [`app/db/`](app/db/) | SQLAlchemy models + the write path (the recorder — see below). |
 | [`migrations/`](migrations/) | Alembic migrations. Driven by `app.core.config.Settings.database_url`, not a hardcoded URL in `alembic.ini`. |
 | [`app/modules/replay/`](app/modules/replay/) | Session lifecycle (start/stop/status/latest) wrapping the bridge. |
-| [`app/modules/inference/`](app/modules/inference/) | `HealthScoreOut` — `lstm_rul`'s health+RUL heads and `xgboost_classifier`'s sensor-fault fields once each model's own rolling window fills, ground-truth stand-in / `null` before that (or if an artifact isn't present). |
+| [`app/modules/inference/`](app/modules/inference/) | `HealthScoreOut` — `lstm_rul`'s health+RUL heads and `xgboost_classifier`'s sensor-fault fields once each model's own rolling window fills, `autoencoder`'s row-level anomaly score on every scoreable frame, ground-truth stand-in / `null` before/without that (or if an artifact isn't present). |
 | [`app/modules/advisory/`](app/modules/advisory/) | Explicit placeholder — no rule set exists anywhere in the repo yet. |
 | [`app/modules/ingestion/`](app/modules/ingestion/) | Reports bridge/session state. Only means "current live feed health" once a real ECU source exists — right now it's just replay activity. |
-| [`app/core/`](app/core/) | Settings (env-driven), logging, `model_loader.py` (loads `lstm_rul` and `xgboost_classifier`; `digital_twin` still `NotImplementedError` — see its `ml/artifacts/digital_twin/metadata.json` for what blocks it). |
+| [`app/core/`](app/core/) | Settings (env-driven), logging, `model_loader.py` (loads `lstm_rul`, `xgboost_classifier`, and `autoencoder`; `digital_twin` remains `NotImplementedError` via `load_model()`'s generic dispatch since it's only ever consumed as a dependency of the autoencoder's residual features via `ml/features/feature_engineering.py`'s own cached loader, never loaded standalone). |
 
 ## Architecture
 
@@ -81,10 +81,26 @@ models don't need scaling to split correctly, unlike `lstm_rul` where the
 scaler is load-bearing) — see that module's docstring for the full
 reasoning, including how the `engine_state` one-hot category list was
 reconstructed from the training notebook's own printed output rather than a
-fitted encoder. `autoencoder` (anomaly detection) is trained
-(`ml/artifacts/autoencoder/v3/`) but not wired into the bridge yet — its
-`metadata.json` needs `ml/artifacts/digital_twin/`, which doesn't exist in
-this repo.
+fitted encoder.
+
+**`autoencoder`'s reconstruction-error anomaly score is also wired**, a
+*third* independent signal (`anomaly_score`/`is_anomalous`/
+`anomaly_model_version`) alongside `lstm_rul`'s health/fault/RUL fields and
+`xgboost_classifier`'s `sensor_fault_*` fields — never merged with either.
+Unlike those two, it's **row-level** (`ml/training/autoencoder/README.md`'s
+"Row-level (flat)" design): no rolling window is buffered for it, it scores
+every frame `BridgeService` sees via
+`app/modules/inference/autoencoder_features.py`'s
+`build_autoencoder_features()`, which reruns
+`ml/features/feature_engineering.py`'s `physics_residuals()` on that single
+frame using `ml/artifacts/digital_twin/v3/`'s 27 per-channel regressors
+(now present in this repo, paired with `autoencoder/v3` — mixing versions
+silently produces garbage, see that model's README). Returns `null` for a
+frame whose `engine_state` is a gated transient
+(`STARTING`/`SHUTDOWN`/`THROTTLE_TRANSIENT`) or where a needed channel is
+NaN (e.g. vibration outside its sidecar-active states) — same honest-gap
+convention `xgboost_classifier`'s pre-window-fill `null`s use, just gated on
+a different condition.
 
 **No TimescaleDB.** `app/db/models.py` has zero hypertable/partitioning
 calls — decided when the deployment target became Render + Supabase (free

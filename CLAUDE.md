@@ -100,25 +100,37 @@ a first working slice**: `ml/features/fit_digital_twin.py` fits data-driven
 expected-value models from healthy-baseline missions, and
 `ml/features/feature_engineering.py`'s `physics_residuals()` applies them
 with transient-state gating — verified to cleanly discriminate a real fault
-(see `build_plan.md`'s Step 7 log). **Step 8 is underway**: autoencoder and LSTM training are actively in
-progress (ML engineers working from
-`ml/notebooks/DroneAcharaya_Preprocessing.ipynb` plus
-`ml/training/autoencoder/autoencoder_training.ipynb` and
-`ml/training/lstm_rul/lstm_training.ipynb`); the XGBoost classifier hasn't
-started yet. **Step 9 (bridge + recorder + replay) has a first real,
-end-to-end vertical slice**: `backend/app/bridge/` (a `FrameSource`
-protocol + `ReplaySource`, `BridgeService` orchestrating writes +
-broadcast, `can_framing.py` explicitly stubbed), SQLAlchemy models +
-Alembic migrations in `backend/app/db/` (plain Postgres/SQLite — no
-TimescaleDB, see below), and real `/replay`, `/inference`, `/advisory`,
-`/ingestion` endpoints replacing the four stub routers. Inference runs a
-ground-truth stand-in (`backend/app/modules/inference/service.py`) mapping
-each run's `fault_class` to its `contract/health-parameter-registry.md`
-health column — `model_loader.py` stays untouched until real `ml/artifacts/`
-exist (Step 7's later item, not started). **No data exists in
-`data/sample_runs/` yet** — it's empty, waiting on the team's real data (see
-that folder's README); the bridge/API code is built and tested against it,
-just idle until files land there.
+(see `build_plan.md`'s Step 7 log). **Step 8 is done: all three models are
+trained and wired into the backend.** `lstm_rul` (v1, multi-head
+health/RUL), `xgboost_classifier` (v1, two per-channel sensor-fault
+classifiers), and `autoencoder` (v3, paired with
+`ml/artifacts/digital_twin/v3/`'s 27 per-channel regressors) all have real
+artifacts loaded by `backend/app/core/model_loader.py` — see
+`ml/training/README.md`'s per-model status table and each model's own
+README (`ml/training/{autoencoder,xgboost_classifier,lstm_rul}/README.md`)
+for training details, metrics, and known limitations (e.g. `lstm_rul`'s own
+sensor-fault head being deliberately excluded from the backend in favor of
+`xgboost_classifier`'s). **Step 9 (bridge + recorder + replay) has a real,
+end-to-end vertical slice now serving real model output, not just ground
+truth**: `backend/app/bridge/` (a `FrameSource` protocol + `ReplaySource`,
+`BridgeService` orchestrating writes + broadcast, `can_framing.py`
+explicitly stubbed), SQLAlchemy models + Alembic migrations in
+`backend/app/db/` (plain Postgres/SQLite — no TimescaleDB, see below), and
+real `/replay`, `/inference`, `/advisory`, `/ingestion` endpoints replacing
+the four stub routers. `/inference`'s `HealthScoreOut` runs `lstm_rul`'s
+health/fault/RUL heads once a session's 60-frame rolling window fills,
+`xgboost_classifier`'s sensor-fault fields once a shorter 10-frame window
+fills, and `autoencoder`'s row-level anomaly score on every scoreable
+frame (`null` on gated transient states) — a ground-truth stand-in
+(`backend/app/modules/inference/service.py`, mapping each run's
+`fault_class` to its `contract/health-parameter-registry.md` health column)
+covers any session before those windows fill, or if an artifact isn't
+present. See `backend/CLAUDE.md` for the full wiring. **No data exists in
+the real, tracked `data/sample_runs/` yet** — it's empty, waiting on the
+team's real data (see that folder's README); the bridge/API code is built
+and tested against it, and has also been exercised end-to-end against
+synthetic local fixtures, but stays idle in this repo until real files land
+there.
 
 **Deployment target decided: Render (backend, from GitHub) + Supabase (free
 Postgres tier) — no Docker, no TimescaleDB, no Grafana.** Local dev defaults
@@ -127,9 +139,12 @@ to a zero-setup local SQLite file (`backend/app/core/config.py`'s
 env var, no code change either way. **Grafana was dropped entirely** after
 the frontend PR merged real dashboard UI (`frontend/app/dashboard/`) —
 that's the presentation layer now, not Grafana; see `ops/infra/README.md`
-for the full reasoning. That frontend is currently hardcoded/mocked data,
-not yet wired to these new endpoints — that wiring is the next real gap, not
-the backend endpoints themselves.
+for the full reasoning. That frontend is mostly still hardcoded/mocked data,
+except `frontend/app/dashboard/_components/LiveModelPanel.tsx`, which is
+genuinely wired to `/replay` + `/inference` and shows real
+`lstm_rul`/`xgboost_classifier`/`autoencoder` output once a replay session
+starts — wiring the rest of the dashboard's mocked panels is the next real
+gap, not the backend endpoints themselves.
 
 `data/schema.md` is an older flat schema with seven fault classes vs.
 `contract/`'s draft with 15 — still not reconciled. See
@@ -150,7 +165,7 @@ and a nested `CLAUDE.md` added under it at that point.
 | Physics (MVEM) | [`simulation/`](simulation/) | Simulink plant model (`model/`), MATLAB drivers (`scripts/`), fault ramp definitions (`fault_injection/`), calibration references (`calibration/`). Exports telemetry to `data/raw/`. |
 | ML | [`ml/`](ml/) | Three models under `training/` (`autoencoder/`, `xgboost_classifier/`, `lstm_rul/`), shared `features/feature_engineering.py`, `evaluation/` protocol, versioned `artifacts/` (gitignored). Reads from `data/processed/`. |
 | Serving | [`backend/`](backend/) | FastAPI service. `app/bridge/` (Step 9): `FrameSource`/`ReplaySource`/`BridgeService`, the DB write path *is* the recorder. `app/db/`: SQLAlchemy models + Alembic migrations, plain Postgres (Supabase in prod, SQLite locally by default) — no TimescaleDB. `app/modules/{replay,inference,advisory,ingestion}/`: real endpoints; inference is a ground-truth stand-in until `app/core/model_loader.py` has real `ml/artifacts/` to load (not yet). |
-| Presentation (2D) | [`frontend/`](frontend/) | Next.js 15 dashboard — merged, real UI (`app/dashboard/`), **currently hardcoded/mocked data, not wired to the backend yet**. This is the presentation layer now; Grafana was evaluated and dropped (see `ops/infra/README.md`). `frontend/lib/types.ts` still mirrors the *older* flat schema — not yet reconciled with the bridge's real response shapes (`HealthScoreOut`, `EngineFrame`). |
+| Presentation (2D) | [`frontend/`](frontend/) | Next.js 15 dashboard — merged, real UI (`app/dashboard/`), **mostly still hardcoded/mocked data**, except `app/dashboard/_components/LiveModelPanel.tsx`, which is genuinely wired to the backend's `/replay` + `/inference` endpoints (`HealthScoreOut`, `EngineFrame`) and shows real `lstm_rul`/`xgboost_classifier`/`autoencoder` output. This is the presentation layer now; Grafana was evaluated and dropped (see `ops/infra/README.md`). `frontend/lib/types.ts` still mirrors the *older* flat schema for the rest of the dashboard — not yet reconciled with the bridge's real response shapes outside the live panel. |
 | Presentation (3D) | *not yet created* | Unreal Engine visualization — see below. |
 
 **Data flow, end to end:**
@@ -301,6 +316,8 @@ everyone else.
 | [`simulation/README.md`](simulation/README.md) | Simulink model tree layout — `model/` and `scripts/` are built and validated (Steps 1-6). |
 | [`ops/infra/README.md`](ops/infra/README.md) | Deployment target (Render + Supabase, no Docker/Timescale/Grafana) and why each of those calls was made. |
 | [`backend/CLAUDE.md`](backend/CLAUDE.md) | The actual bridge/DB/API architecture (Step 9), API surface, and conventions for extending it. |
+| [`ml/CLAUDE.md`](ml/CLAUDE.md) | The three models' training/feature-engineering conventions and non-negotiables. |
+| [`simulation/CLAUDE.md`](simulation/CLAUDE.md) | The Simulink model tree's non-negotiables (contract columns, shared environment service, validation gate). |
 | [`data/sample_runs/README.md`](data/sample_runs/README.md) | The layout the bridge's `ReplaySource` expects — currently empty, waiting on real data. |
 
 ## Working conventions

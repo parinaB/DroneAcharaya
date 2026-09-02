@@ -140,4 +140,13 @@ export interface HealthScoreOut {
   sensor_fault_cht_c3: SensorFaultClassChtC3 | null;
   sensor_fault_bearing_vibration: SensorFaultClassBearing | null;
   sensor_fault_model_version: string | null;
+  /** autoencoder's reconstruction-error anomaly signal -- a third, additive
+   * vocabulary independent of fault_type and sensor_fault_* above ("is
+   * something generally off" vs. "which fault"/"which sensor"). Row-level,
+   * not windowed, but null on frames whose engine_state is a gated
+   * transient (STARTING/SHUTDOWN/THROTTLE_TRANSIENT) or if no autoencoder
+   * artifact is loaded. */
+  anomaly_score: number | null;
+  is_anomalous: boolean | null;
+  anomaly_model_version: string | null;
 }
