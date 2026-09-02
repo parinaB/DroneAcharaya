@@ -12,6 +12,14 @@ pandas
 # stable across versions.
 scikit-learn==1.6.1
 xgboost
+# CPU-only build -- the backend only ever runs inference (forward passes on
+# tiny per-frame/per-window inputs, never training), so the default PyPI
+# wheel's bundled CUDA/cuDNN/NCCL/triton libraries (multi-GB) are pure
+# waste here, and were large enough to exhaust CI runners' disk space
+# during `pip install`. --extra-index-url below points pip at PyTorch's own
+# CPU wheel index (see https://pytorch.org/get-started/locally/) instead of
+# the default PyPI package, which ships full CUDA support.
+--extra-index-url https://download.pytorch.org/whl/cpu
 torch
 joblib
 shap
