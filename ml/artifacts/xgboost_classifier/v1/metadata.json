@@ -1,0 +1,59 @@
+{
+  "model": "xgboost_classifier",
+  "version": "v1",
+  "trained_in": "ml/training/xgboost_classifier/xgboost_training.ipynb",
+  "dataset": "data/raw/main_batch_1000 (batch 3, 1312 train / 375 validation runs)",
+  "files": {
+    "xgboost_cht_c3.json": "XGBClassifier for sensor_fault_active_cht_c3, native XGBoost JSON dump",
+    "xgboost_bearing_vibration.json": "XGBClassifier for sensor_fault_active_vibration_rms_x_bearing_proxy, native XGBoost JSON dump",
+    "xgboost_combined_engine.joblib": "manifest only -- {'model_1': 'xgboost_cht_c3.json', 'model_2': 'xgboost_bearing_vibration.json'}, not a fitted model object"
+  },
+  "label_remapping": {
+    "note": "Each channel's labels were remapped to contiguous 0..K-1 IDs before training, dropping classes never observed on that channel -- model outputs are NOT directly the standard SENSOR_FAULT_CLASSES = [NONE, BIAS, DRIFT, NOISE, STUCK, DROPOUT] indices. Apply the inverse map below to XGBoost's predicted class ID before interpreting it.",
+    "sensor_fault_active_cht_c3": {
+      "num_classes": 5,
+      "xgboost_id_to_sensor_fault_class": { "0": "NONE", "1": "BIAS", "2": "DRIFT", "3": "NOISE", "4": "STUCK" }
+    },
+    "sensor_fault_active_vibration_rms_x_bearing_proxy": {
+      "num_classes": 2,
+      "xgboost_id_to_sensor_fault_class": { "0": "NONE", "1": "DROPOUT" }
+    }
+  },
+  "features": {
+    "feature_order": "SENSOR_COLUMNS + MISSING_FLAG_COLUMNS + ROLLING_FEATURE_COLUMNS + engine_state_col_names -- see ml/training/xgboost_classifier/README.md",
+    "row_level": true,
+    "note": "Unlike lstm_rul, this model is row-level (no windowing/forecast_horizon) -- rolling features over a within-run window substitute for sequence context."
+  },
+  "training": {
+    "n_estimators": 500,
+    "max_depth": 8,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "objective": "multi:softprob",
+    "tree_method": "hist",
+    "early_stopping_rounds": 30,
+    "sample_weight": "inverse train-split class frequency, per channel"
+  },
+  "metrics": {
+    "sensor_fault_active_cht_c3": {
+      "accuracy": 0.93,
+      "macro_f1": 0.76,
+      "per_class_f1": { "NONE": 0.97, "BIAS": 0.43, "DRIFT": 0.39, "NOISE": 1.00, "STUCK": 1.00 }
+    },
+    "sensor_fault_active_vibration_rms_x_bearing_proxy": {
+      "accuracy": 1.00,
+      "macro_f1": 1.00,
+      "per_class_f1": { "NONE": 1.00, "DROPOUT": 1.00 },
+      "caveat": "Only 486 DROPOUT examples in validation -- a near-perfect score on this few positive examples warrants independent re-verification before trusting it as production-grade; see README."
+    },
+    "combined_engine_health_binary": {
+      "description": "NONE-on-both-channels vs any-fault-on-either-channel, both models' outputs combined via a simple AND-of-NONE rule",
+      "accuracy": 0.9409,
+      "healthy_precision": 0.97,
+      "healthy_recall": 0.96,
+      "fault_precision": 0.73,
+      "fault_recall": 0.77
+    }
+  }
+}

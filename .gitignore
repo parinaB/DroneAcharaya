@@ -144,16 +144,13 @@ data/processed/**
 *.tfrecord
 !data/sample_runs/**
 
-# -----------------------------------------------------------------------------
-# ML artifacts (ml/artifacts/)
-# Model weights are large binaries; distribute them out of band and keep
-# metadata.json with them (see ml/artifacts/README.md).
-# -----------------------------------------------------------------------------
-ml/artifacts/**
-!ml/artifacts/README.md
-!ml/artifacts/.gitkeep
-
-# Model weight formats, wherever they land
+# Model weight formats, wherever they land -- unignored file-by-file in the
+# ml/artifacts/ section below where a specific file is a real runtime
+# dependency; everywhere else (scratch checkpoints, other versions, other
+# folders entirely) they stay ignored by default. Must come BEFORE the
+# ml/artifacts/ allow-list below: gitignore applies rules in file order, so a
+# broad *.pt/*.joblib rule appearing AFTER a specific !unignore would win and
+# silently re-ignore it.
 *.pt
 *.pth
 *.ckpt
@@ -161,6 +158,55 @@ ml/artifacts/**
 *.pkl
 *.joblib
 *.safetensors
+
+# -----------------------------------------------------------------------------
+# ML artifacts (ml/artifacts/)
+# Everything is gitignored by default (training scratch, exploratory
+# checkpoints, per-run experiment dirs), EXCEPT the exact files
+# backend/app/core/model_loader.py reads at runtime for the versions it's
+# pinned to (backend/app/core/config.py's *_version settings) -- those are
+# small (~16MB total) and committed directly, no Git LFS, so `git clone` +
+# `uvicorn` works with zero out-of-band artifact-fetch step, including on
+# Render. Anything NOT in model_loader.py's read list (evaluation exports
+# like validation_predictions.csv, scratch/experiment checkpoints, other
+# versions not yet wired) stays gitignored -- distribute those out of band
+# (see ml/artifacts/README.md). Bump the allow-list below when
+# config.py's *_version defaults move to a new version.
+# -----------------------------------------------------------------------------
+ml/artifacts/**
+!ml/artifacts/README.md
+!ml/artifacts/.gitkeep
+
+!ml/artifacts/lstm_rul/
+!ml/artifacts/lstm_rul/v1/
+ml/artifacts/lstm_rul/v1/*
+!ml/artifacts/lstm_rul/v1/lstm_best.pt
+!ml/artifacts/lstm_rul/v1/scaler.joblib
+!ml/artifacts/lstm_rul/v1/engine_state_encoder.joblib
+!ml/artifacts/lstm_rul/v1/rul_scale_seconds.json
+!ml/artifacts/lstm_rul/v1/metadata.json
+
+!ml/artifacts/xgboost_classifier/
+!ml/artifacts/xgboost_classifier/v1/
+ml/artifacts/xgboost_classifier/v1/*
+!ml/artifacts/xgboost_classifier/v1/xgboost_cht_c3.json
+!ml/artifacts/xgboost_classifier/v1/xgboost_bearing_vibration.json
+!ml/artifacts/xgboost_classifier/v1/metadata.json
+
+!ml/artifacts/autoencoder/
+!ml/artifacts/autoencoder/v3/
+ml/artifacts/autoencoder/v3/*
+!ml/artifacts/autoencoder/v3/model.pt
+!ml/artifacts/autoencoder/v3/scaler.json
+!ml/artifacts/autoencoder/v3/threshold.json
+!ml/artifacts/autoencoder/v3/metadata.json
+# validation_predictions.csv (~750MB, evaluation-only) stays ignored
+
+!ml/artifacts/digital_twin/
+!ml/artifacts/digital_twin/v3/
+ml/artifacts/digital_twin/v3/*
+!ml/artifacts/digital_twin/v3/*.joblib
+!ml/artifacts/digital_twin/v3/metadata.json
 
 # Experiment tracking / local run output
 mlruns/

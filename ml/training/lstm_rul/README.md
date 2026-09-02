@@ -264,8 +264,10 @@ detection as production-ready.
 
 ## Artifacts
 
-Versioned in `ml/artifacts/lstm_rul/v1/` (gitignored; distribute out of band
-per `ml/artifacts/README.md`):
+Versioned in `ml/artifacts/lstm_rul/v1/` — this version is pinned in
+`backend/app/core/config.py` and committed directly (see
+`ml/artifacts/README.md`'s allow-list); a superseded or experimental version
+would instead be gitignored and distributed out of band:
 
 | File | Contents |
 | --- | --- |

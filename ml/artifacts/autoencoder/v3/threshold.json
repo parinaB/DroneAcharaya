@@ -1,0 +1,5 @@
+{
+  "threshold": 0.1836736500263214,
+  "percentile": 95.0,
+  "computed_on": "validation split, healthy rows (per-row ground-truth health labels)"
+}
