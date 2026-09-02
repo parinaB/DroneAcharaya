@@ -28,10 +28,11 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
-      # requirements.txt pulls torch, so the first run on a cold cache is
-      # slow (~3-4 min). The pip cache above absorbs that on subsequent runs;
-      # if it stays painful, split the heavy training deps out of the
-      # backend's runtime requirements rather than pinning down the cache.
+      # requirements.txt pins torch to the CPU-only wheel (see its comment) --
+      # unpinned torch pulls PyPI's default CUDA build plus the full
+      # nvidia-*/cuda-toolkit dependency chain, which was large enough to
+      # exhaust this runner's disk space outright. The pip cache above still
+      # absorbs the ~200MB CPU wheel on repeat runs.
       - name: Install dependencies
         run: pip install -r backend/requirements.txt
 
