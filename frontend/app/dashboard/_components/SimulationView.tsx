@@ -26,8 +26,6 @@ export interface SimulationViewProps {
   scenario: number;
   onScenarioChange: (i: number) => void;
   params: SimParams;
-  onParamsChange: (params: SimParams) => void;
-  onResetParams: () => void;
   playing: boolean;
   onTogglePlay: () => void;
   speed: number;
@@ -46,8 +44,6 @@ export function SimulationView({
   scenario,
   onScenarioChange,
   params,
-  onParamsChange,
-  onResetParams,
   playing,
   onTogglePlay,
   speed,
@@ -71,13 +67,7 @@ export function SimulationView({
         overflow: "hidden",
       }}
     >
-      <ScenarioPanel
-        scenario={scenario}
-        onScenarioChange={onScenarioChange}
-        params={params}
-        onParamsChange={onParamsChange}
-        onResetParams={onResetParams}
-      />
+      <ScenarioPanel scenario={scenario} onScenarioChange={onScenarioChange} />
       <Viewport
         playing={playing}
         onTogglePlay={onTogglePlay}
@@ -99,19 +89,10 @@ export function SimulationView({
 function ScenarioPanel({
   scenario,
   onScenarioChange,
-  params,
-  onParamsChange,
-  onResetParams,
 }: {
   scenario: number;
   onScenarioChange: (i: number) => void;
-  params: SimParams;
-  onParamsChange: (params: SimParams) => void;
-  onResetParams: () => void;
 }) {
-  const set = <K extends keyof SimParams>(key: K, value: number) =>
-    onParamsChange({ ...params, [key]: value });
-
   return (
     <div
       style={{
@@ -124,54 +105,48 @@ function ScenarioPanel({
         padding: "22px 18px 28px 18px",
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 9, flex: "0 0 auto" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: "0 0 auto" }}>
         <SectionLabel>SCENARIO</SectionLabel>
         {SCENARIOS.map((s, i) => {
           const t = cardTabStyle(scenario === i);
+          const active = scenario === i;
           return (
             <div
               key={s.title}
               onClick={() => onScenarioChange(i)}
               className="dt-tab dt-scenario-card"
               style={{
-                padding: "11px 12px",
-                borderRadius: 7,
+                padding: "14px 15px",
+                borderRadius: 9,
                 cursor: "pointer",
                 background: t.bg,
                 boxShadow: t.ring,
                 display: "flex",
                 flexDirection: "column",
-                gap: 3,
+                gap: 6,
               }}
             >
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: t.fg }}>{s.title}</div>
-              <div style={{ fontFamily: font.mono, fontSize: 11, color: color.textLabel }}>{s.subtitle}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: s.critical ? color.danger : color.accent,
+                    flex: "0 0 auto",
+                  }}
+                />
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: t.fg }}>{s.title}</div>
+              </div>
+              <div style={{ fontFamily: font.mono, fontSize: 11, color: active ? color.textMuted : color.textLabel }}>
+                {s.subtitle}
+              </div>
+              <div style={{ fontSize: 12, lineHeight: 1.5, color: active ? color.textDim : color.textLabel }}>
+                {s.detail}
+              </div>
             </div>
           );
         })}
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 15, borderTop: `1px solid ${color.border}`, paddingTop: 20, flex: "0 0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <SectionLabel>PARAMETERS</SectionLabel>
-          <span onClick={onResetParams} style={{ fontFamily: font.mono, fontSize: 11, color: "#8aa8a3", cursor: "pointer" }}>
-            RESET
-          </span>
-        </div>
-
-        <ParamSlider label="Throttle" display={`${params.throttle}%`} min={20} max={100} value={params.throttle} onChange={(v) => set("throttle", v)} />
-        <ParamSlider label="Altitude" display={altLabel(params.alt)} min={0} max={300} value={params.alt} onChange={(v) => set("alt", v)} />
-        <ParamSlider label="Outside air temp" display={oatLabel(params.oat)} min={-40} max={50} value={params.oat} onChange={(v) => set("oat", v)} />
-        <ParamSlider label="Mixture" display={mixLabel(params.mix)} min={-60} max={40} value={params.mix} onChange={(v) => set("mix", v)} />
-        <ParamSlider
-          label="Injector fault severity"
-          display={`${params.fault}%`}
-          min={0}
-          max={100}
-          value={params.fault}
-          onChange={(v) => set("fault", v)}
-          danger
-        />
       </div>
 
       <div style={{ borderTop: `1px solid ${color.border}`, paddingTop: 18, display: "flex", flexDirection: "column", gap: 8, flex: "0 0 auto" }}>
@@ -188,44 +163,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ fontFamily: font.mono, fontSize: 11, color: color.textLabel2, letterSpacing: "0.13em" }}>
       {children}
-    </div>
-  );
-}
-
-function ParamSlider({
-  label,
-  display,
-  min,
-  max,
-  value,
-  onChange,
-  danger,
-}: {
-  label: string;
-  display: string;
-  min: number;
-  max: number;
-  value: number;
-  onChange: (v: number) => void;
-  danger?: boolean;
-}) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <span style={{ fontSize: 12, color: color.textDim }}>{label}</span>
-        <span style={{ fontFamily: font.mono, fontSize: 11.5, color: danger ? color.danger : color.text }}>
-          {display}
-        </span>
-      </div>
-      <input
-        type="range"
-        className="dt-slider"
-        min={min}
-        max={max}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        style={{ width: "100%", accentColor: danger ? color.danger : color.accent, background: "transparent" }}
-      />
     </div>
   );
 }
