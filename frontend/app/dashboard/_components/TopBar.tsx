@@ -1,6 +1,6 @@
 "use client";
 
-import { color } from "../_lib/tokens";
+import { color, font } from "../_lib/tokens";
 import type { Screen, Theme } from "../_lib/state";
 
 export function TopBar({
@@ -54,6 +54,28 @@ export function TopBar({
       >
         {theme === "dark" ? <SunIcon /> : <MoonIcon />}
       </button>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+        <span style={{ fontFamily: font.mono, fontSize: 11.5, color: color.textDim, whiteSpace: "nowrap" }}>
+          .DLL not found
+        </span>
+        <div
+          style={{
+            width: 29,
+            height: 29,
+            borderRadius: "50%",
+            background: color.tabOnBg,
+            border: `1px solid ${color.border}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flex: "0 0 29px",
+            color: color.textDim,
+          }}
+        >
+          <ProfileIcon />
+        </div>
+      </div>
     </header>
   );
 }
@@ -78,6 +100,15 @@ function MoonIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
       <path d="M20.4 14.7A9 9 0 1 1 9.3 3.6a7.2 7.2 0 0 0 11.1 11.1z" />
+    </svg>
+  );
+}
+
+function ProfileIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" />
     </svg>
   );
 }
