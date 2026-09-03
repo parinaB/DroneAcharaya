@@ -111,6 +111,7 @@ export function LiveModelPanel() {
 
   return (
     <section
+      className="dt-surface"
       style={{
         margin: "16px 24px",
         padding: 16,
@@ -209,7 +210,7 @@ export function LiveModelPanel() {
 function Field({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div>
-      <div style={{ color: color.textLabel2, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+      <div style={{ color: color.textLabel2, fontSize: 11.5, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
         {label}
       </div>
       <div style={{ color: highlight ? color.danger : color.text, fontSize: 14 }}>{value}</div>
