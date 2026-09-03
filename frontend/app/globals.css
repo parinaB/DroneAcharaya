@@ -25,27 +25,127 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Dashboard (Live Dashboard / Simulation): dark digital-twin UI. */
+/* Dashboard (Live Dashboard / Simulation): dark digital-twin UI, with a
+ * light theme toggled via [data-theme] on the root element. Every color
+ * `_lib/tokens.ts` exposes reads one of these variables, so components
+ * never branch on theme themselves. */
+.dt-root {
+  --dt-bg: #000000;
+  --dt-panel-bg: #0e1113;
+  --dt-panel-bg-alt: #0f1114;
+  --dt-border: #1c2125;
+  --dt-border-soft: #1a1f23;
+  --dt-text: #e8ebed;
+  --dt-text-dim: #b8c0c6;
+  --dt-text-muted: #97a1a8;
+  --dt-text-faint: #7d878e;
+  --dt-text-label: #6f7981;
+  --dt-text-label-2: #626c74;
+  --dt-text-label-3: #5e686f;
+  --dt-text-inactive: #8d979f;
+  --dt-accent: #39ff14;
+  --dt-accent-hover: #7cff5c;
+  --dt-accent-dim: #1f8a35;
+  --dt-danger: #ff4d3d;
+  --dt-danger-hover: #ff6a5c;
+  --dt-danger-soft: #ff7a6d;
+  --dt-danger-glow: rgba(255, 77, 61, 0.28);
+  --dt-tab-on-bg: #1d2427;
+  --dt-tab-on-ring: #2b3238;
+  --dt-tab-off-bg: #12161a;
+  --dt-tab-off-ring: #1c2125;
+  --dt-scrollbar-track: #000000;
+  --dt-scrollbar-thumb: #262b30;
+  --dt-scrollbar-thumb-hover: #363d44;
+  --dt-nav-hover-bg: #161b1f;
+  --dt-btn-ghost-hover-bg: #171c20;
+  --dt-well-bg: #14181b;
+  --dt-glow: rgba(57, 255, 20, 0.45);
+  --dt-glow-shadow: rgba(57, 255, 20, 0.16);
+
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
+.dt-root[data-theme="light"] {
+  --dt-bg: #e4e7e9;
+  --dt-panel-bg: #fafaf8;
+  --dt-panel-bg-alt: #f1f3f1;
+  --dt-border: #d3d9dc;
+  --dt-border-soft: #dde2e4;
+  --dt-text: #0f151a;
+  --dt-text-dim: #333b42;
+  --dt-text-muted: #4c555c;
+  --dt-text-faint: #626a71;
+  --dt-text-label: #757d84;
+  --dt-text-label-2: #858d93;
+  --dt-text-label-3: #99a0a6;
+  --dt-text-inactive: #6b7278;
+  --dt-accent: #0f9d68;
+  --dt-accent-hover: #0b7d53;
+  --dt-accent-dim: #4aac86;
+  --dt-danger: #e0392b;
+  --dt-danger-hover: #b82c21;
+  --dt-danger-soft: #c8493a;
+  --dt-danger-glow: rgba(224, 57, 43, 0.24);
+  --dt-tab-on-bg: #e0ede6;
+  --dt-tab-on-ring: #b3d9c5;
+  --dt-tab-off-bg: #eef0ee;
+  --dt-tab-off-ring: #dde1de;
+  --dt-scrollbar-track: #e4e7e9;
+  --dt-scrollbar-thumb: #bcc3c6;
+  --dt-scrollbar-thumb-hover: #a3aaad;
+  --dt-nav-hover-bg: #e9efeb;
+  --dt-btn-ghost-hover-bg: #e9efeb;
+  --dt-well-bg: #e6e9eb;
+  --dt-glow: rgba(15, 157, 104, 0.45);
+  --dt-glow-shadow: rgba(15, 157, 104, 0.14);
+}
+
 .dt-root ::-webkit-scrollbar {
   width: 9px;
   height: 9px;
 }
 .dt-root ::-webkit-scrollbar-track {
-  background: #0b0d0f;
+  background: var(--dt-scrollbar-track);
 }
 .dt-root ::-webkit-scrollbar-thumb {
-  background: #262b30;
+  background: var(--dt-scrollbar-thumb);
   border-radius: 6px;
 }
 .dt-root ::-webkit-scrollbar-thumb:hover {
-  background: #363d44;
+  background: var(--dt-scrollbar-thumb-hover);
 }
 .dt-root a {
-  color: #4fb391;
+  color: var(--dt-accent);
   text-decoration: none;
 }
 .dt-root a:hover {
-  color: #7fcbb0;
+  color: var(--dt-accent-hover);
+}
+
+/* Subtle elevation for primary surfaces -- dark mode already separates
+ * layers by background tone, but a flat white-on-light-gray page reads as
+ * dull without it. */
+.dt-root[data-theme="light"] .dt-surface {
+  box-shadow: 0 1px 2px rgba(15, 21, 26, 0.05), 0 1px 10px rgba(15, 21, 26, 0.03);
+}
+
+/* Structured, hoverable content cards (stat tiles, per-cylinder/vibration/
+ * sub-system panels, ...): a defined border that lifts and glows on hover
+ * so the grid reads as distinct blocks instead of a flat, flush table. */
+.dt-glow-card {
+  border-radius: 12px;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    background-color 0.2s ease;
+}
+.dt-glow-card:hover {
+  border-color: var(--dt-glow);
+  box-shadow: 0 0 0 1px var(--dt-glow), 0 10px 28px var(--dt-glow-shadow);
+  transform: translateY(-2px);
 }
 @keyframes dt-pulse {
   0%,
@@ -73,14 +173,18 @@ body {
     opacity 0.18s ease;
 }
 .dt-nav-item:hover {
-  background: #161b1f;
-  color: #e8ebed;
+  background: var(--dt-nav-hover-bg);
+  color: var(--dt-text);
 }
+
 .dt-nav-item:active {
   transform: scale(0.985);
 }
 .dt-tab:hover {
   filter: brightness(1.18);
+}
+.dt-root[data-theme="light"] .dt-tab:hover {
+  filter: brightness(0.96);
 }
 .dt-tab:active {
   transform: scale(0.94);
@@ -89,26 +193,81 @@ body {
   transform: translateX(2px);
 }
 .dt-btn-ghost:hover {
-  background: #171c20;
+  background: var(--dt-btn-ghost-hover-bg);
   transform: translateY(-1px);
 }
 .dt-btn-ghost:active {
   transform: translateY(0) scale(0.97);
 }
 .dt-btn-danger:hover {
-  background: #ff6a5c;
+  background: var(--dt-danger-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(255, 77, 61, 0.28);
+  box-shadow: 0 4px 14px var(--dt-danger-glow);
 }
 .dt-btn-danger:active {
   transform: translateY(0) scale(0.97);
 }
 .dt-btn-play:hover {
-  background: #ffffff;
+  filter: brightness(1.12);
   transform: translateY(-1px);
 }
 .dt-btn-play:active {
   transform: translateY(0) scale(0.94);
+}
+
+/* Chart entrance animations: SVG lines draw themselves in (pathLength="1"
+ * normalizes any polyline to a 0-1 dash range so this works regardless of
+ * actual path length), fills fade in behind them, and bars grow from their
+ * anchored edge. Runs once on mount -- there's no re-trigger needed since
+ * the boot screen already guarantees a fresh mount each load. */
+@keyframes dt-draw-line {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.dt-chart-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: dt-draw-line 1.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes dt-chart-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.dt-chart-fill {
+  opacity: 0;
+  animation: dt-chart-fade-in 0.8s ease 0.4s both;
+}
+@keyframes dt-bar-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.dt-bar-fill-x {
+  transform-origin: left center;
+  animation: dt-bar-grow-x 0.8s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+@keyframes dt-bar-grow-y {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+.dt-bar-fill-y {
+  transform-origin: bottom;
+  animation: dt-bar-grow-y 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
 /* Sliders: native accent-color styling stays, just add tactile feedback. */
