@@ -1,6 +1,10 @@
 "use client";
 
-import { color, font } from "../_lib/tokens";
+import { useState } from "react";
+import { color, font, glowVars } from "../_lib/tokens";
+
+const RAIL_WIDTH = 56;
+const PANEL_WIDTH = 420;
 
 const CYLINDERS = [
   { label: "CYL 1", pct: 68, cht: 203, egt: 712, critical: false },
@@ -80,124 +84,230 @@ function CriticalFaultSection({
   onAcknowledge: () => void;
   onOpenPrediction: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [hovering, setHovering] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const width = expanded ? PANEL_WIDTH : RAIL_WIDTH;
+  const showToggle = hovering || focused;
+
   return (
     <section
       style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(0, 420px) minmax(0, 1fr)",
+        display: "flex",
+        height: 540,
         borderBottom: `1px solid ${color.border}`,
         flex: "0 0 auto",
       }}
     >
       <div
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
         style={{
-          padding: "30px 32px 34px 30px",
+          position: "relative",
+          width,
+          flex: `0 0 ${width}px`,
           borderRight: `1px solid ${color.border}`,
-          display: "flex",
-          flexDirection: "column",
-          gap: 22,
           background: color.panelBgAlt,
-          transition: "opacity .25s ease",
-          opacity: acknowledged ? 0.72 : 1,
+          transition: "width .24s cubic-bezier(0.16, 1, 0.3, 1), flex-basis .24s cubic-bezier(0.16, 1, 0.3, 1)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <span
-            className={acknowledged ? undefined : "dt-pulse"}
-            style={{ width: 7, height: 7, borderRadius: "50%", background: acknowledged ? "#6b7a80" : color.danger, transition: "background-color .25s ease" }}
-          />
-          <span
-            style={{
-              fontFamily: font.mono,
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: "0.16em",
-              color: acknowledged ? color.textLabel : color.danger,
-              transition: "color .25s ease",
-            }}
-          >
-            {acknowledged ? "CRITICAL FAULT · ACKNOWLEDGED" : "CRITICAL FAULT"}
-          </span>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 30,
-              lineHeight: 1.14,
-              fontWeight: 700,
-              letterSpacing: "-0.022em",
-              textWrap: "balance",
-            }}
-          >
-            Cylinder 3 misfire with combustion instability
-          </h1>
-          <div style={{ fontSize: 13.5, lineHeight: 1.6, color: color.textMuted, textWrap: "pretty" }}>
-            EGT rising 8 °C/min against a falling twin prediction. Injector pulse width drifting
-            +6.2%; residual outside the 3σ envelope for 41 cycles.
-          </div>
-        </div>
-
-        <div
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          className="dt-btn-danger"
+          aria-label={expanded ? "Collapse critical fault panel" : "Expand critical fault panel"}
+          title={expanded ? "Collapse" : "Expand critical fault details"}
           style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 1,
-            background: color.border,
-            border: `1px solid ${color.border}`,
-            borderRadius: 9,
-            overflow: "hidden",
+            position: "absolute",
+            top: 14,
+            right: -13,
+            width: 26,
+            height: 26,
+            borderRadius: "50%",
+            border: "none",
+            background: color.danger,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            color: "#150605",
+            padding: 0,
+            zIndex: 2,
+            opacity: showToggle ? 1 : 0,
+            pointerEvents: showToggle ? "auto" : "none",
+            transition: "opacity 0.18s ease, background-color 0.18s ease, transform 0.12s ease",
           }}
         >
-          <StatBlock label="CONFIDENCE" value="94.2%" />
-          <StatBlock label="RUL · INJECTOR 3" value="18.4 h" />
-        </div>
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.22s ease" }}
+          >
+            <polyline points="9 4 17 12 9 20" />
+          </svg>
+        </button>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <span style={{ fontFamily: font.mono, fontSize: 9, color: color.textLabel, letterSpacing: "0.12em" }}>
-            ADVISORY
-          </span>
-          <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.5, color: color.text }}>
-            Reduce power to 65%, enrich mixture, divert to nearest recovery site.
+        <div style={{ height: "100%", overflow: "hidden", position: "relative" }}>
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              overflow: "hidden",
+              padding: "36px 38px 40px 36px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 22,
+              transition: "opacity .28s ease",
+              opacity: expanded ? (acknowledged ? 0.72 : 1) : 0,
+              pointerEvents: expanded ? "auto" : "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 9, flexShrink: 0 }}>
+              <span
+                className={acknowledged ? undefined : "dt-pulse"}
+                style={{ width: 7, height: 7, borderRadius: "50%", background: acknowledged ? "#6b7a80" : color.danger, transition: "background-color .25s ease" }}
+              />
+              <span
+                style={{
+                  fontFamily: font.mono,
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  letterSpacing: "0.16em",
+                  color: acknowledged ? color.textLabel : color.danger,
+                  transition: "color .25s ease",
+                }}
+              >
+                {acknowledged ? "CRITICAL FAULT · ACKNOWLEDGED" : "CRITICAL FAULT"}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, whiteSpace: "normal", flexShrink: 0 }}>
+              <h1
+                style={{
+                  margin: 0,
+                  fontSize: 30,
+                  lineHeight: 1.14,
+                  fontWeight: 700,
+                  letterSpacing: "-0.022em",
+                  textWrap: "balance",
+                }}
+              >
+                Cylinder 3 misfire with combustion instability
+              </h1>
+              <div style={{ fontSize: 13.5, lineHeight: 1.6, color: color.textMuted, textWrap: "pretty" }}>
+                EGT rising 8 °C/min against a falling twin prediction. Injector pulse width drifting
+                +6.2%; residual outside the 3σ envelope for 41 cycles.
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 1,
+                background: color.border,
+                border: `1px solid ${color.border}`,
+                borderRadius: 9,
+                overflow: "hidden",
+                flexShrink: 0,
+              }}
+            >
+              <StatBlock label="CONFIDENCE" value="94.2%" />
+              <StatBlock label="RUL · INJECTOR 3" value="18.4 h" />
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
+              <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.textLabel, letterSpacing: "0.12em" }}>
+                ADVISORY
+              </span>
+              <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.5, color: color.text, whiteSpace: "normal" }}>
+                Reduce power to 65%, enrich mixture, divert to nearest recovery site.
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 9, marginTop: 2, flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={onOpenPrediction}
+                className="dt-btn-danger"
+                style={{
+                  padding: "10px 18px",
+                  borderRadius: 7,
+                  background: color.danger,
+                  color: "#150605",
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  border: "none",
+                }}
+              >
+                Open prediction
+              </button>
+              <button
+                type="button"
+                onClick={onAcknowledge}
+                className="dt-btn-ghost"
+                style={{
+                  padding: "10px 18px",
+                  borderRadius: 7,
+                  border: acknowledged ? `1px solid ${color.accentDim}` : "1px solid #2b3238",
+                  color: acknowledged ? color.accent : color.textDim,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: "transparent",
+                }}
+              >
+                {acknowledged ? "Acknowledged ✓" : "Acknowledge"}
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div style={{ display: "flex", gap: 9, marginTop: 2 }}>
-          <button
-            type="button"
-            onClick={onOpenPrediction}
-            className="dt-btn-danger"
+          <div
+            onClick={() => setExpanded(true)}
             style={{
-              padding: "10px 18px",
-              borderRadius: 7,
-              background: color.danger,
-              color: "#150605",
-              fontSize: 12.5,
-              fontWeight: 700,
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 12,
+              padding: "20px 0",
               cursor: "pointer",
-              border: "none",
+              transition: "opacity .28s ease",
+              opacity: expanded ? 0 : 1,
+              pointerEvents: expanded ? "none" : "auto",
             }}
           >
-            Open prediction
-          </button>
-          <button
-            type="button"
-            onClick={onAcknowledge}
-            className="dt-btn-ghost"
-            style={{
-              padding: "10px 18px",
-              borderRadius: 7,
-              border: acknowledged ? `1px solid ${color.accentDim}` : "1px solid #2b3238",
-              color: acknowledged ? color.accent : color.textDim,
-              fontSize: 12.5,
-              fontWeight: 600,
-              cursor: "pointer",
-              background: "transparent",
-            }}
-          >
-            {acknowledged ? "Acknowledged ✓" : "Acknowledge"}
-          </button>
+            <span
+              className={acknowledged ? undefined : "dt-pulse"}
+              style={{ width: 7, height: 7, borderRadius: "50%", background: acknowledged ? "#6b7a80" : color.danger, flex: "0 0 auto" }}
+            />
+            <span
+              style={{
+                fontFamily: font.mono,
+                fontSize: 11.5,
+                fontWeight: 600,
+                letterSpacing: "0.16em",
+                color: acknowledged ? color.textLabel : color.danger,
+                writingMode: "vertical-rl",
+                transform: "rotate(180deg)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              CRITICAL FAULT
+            </span>
+          </div>
         </div>
       </div>
 
@@ -208,8 +318,8 @@ function CriticalFaultSection({
 
 function StatBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ background: color.panelBgAlt, padding: "15px 16px", display: "flex", flexDirection: "column", gap: 5 }}>
-      <span style={{ fontFamily: font.mono, fontSize: 9, color: color.textLabel, letterSpacing: "0.12em" }}>
+    <div style={{ background: color.panelBgAlt, padding: "18px 20px", display: "flex", flexDirection: "column", gap: 5 }}>
+      <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.textLabel, letterSpacing: "0.12em" }}>
         {label}
       </span>
       <span style={{ fontFamily: font.mono, fontSize: 22, fontWeight: 600, color: color.danger }}>{value}</span>
@@ -219,11 +329,11 @@ function StatBlock({ label, value }: { label: string; value: string }) {
 
 function TwinDivergenceChart() {
   return (
-    <div style={{ padding: "26px 30px 30px 30px", display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+    <div style={{ flex: "1 1 auto", padding: "30px 34px 34px 34px", display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 20, flexWrap: "wrap" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <div style={{ fontSize: 14, fontWeight: 600 }}>Twin divergence, cylinder 3 EGT</div>
-          <div style={{ fontFamily: font.mono, fontSize: 10, color: color.textLabel, letterSpacing: "0.05em" }}>
+          <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.textLabel, letterSpacing: "0.05em" }}>
             MEASURED VS PREDICTED · LAST 30 MIN
           </div>
         </div>
@@ -244,23 +354,29 @@ function TwinDivergenceChart() {
           </g>
           <line x1="0" y1="52" x2="820" y2="52" stroke={color.danger} strokeOpacity=".38" strokeWidth="1" strokeDasharray="5 5" />
           <path
+            className="dt-chart-fill"
             d="M0,200 65,196 130,198 195,190 260,186 325,180 390,175 455,166 520,146 585,124 650,100 715,78 780,60 820,52 L820,180 780,178 715,176 650,173 585,170 520,166 455,163 390,160 325,157 260,154 195,152 130,150 65,148 0,147 Z"
             fill="rgba(255,77,61,.10)"
           />
           <polyline
+            className="dt-chart-line"
+            pathLength="1"
             points="0,147 65,148 130,150 195,152 260,154 325,157 390,160 455,163 520,166 585,170 650,173 715,176 780,178 820,180"
             fill="none"
             stroke={color.accent}
             strokeWidth="1.8"
           />
           <polyline
+            className="dt-chart-line"
+            pathLength="1"
+            style={{ animationDelay: "0.15s" }}
             points="0,200 33,197 65,196 98,199 130,198 163,193 195,190 228,192 260,186 293,183 325,180 358,183 390,175 423,171 455,166 488,157 520,146 553,136 585,124 618,113 650,100 683,90 715,78 748,68 780,60 820,52"
             fill="none"
             stroke={color.danger}
             strokeWidth="2.4"
           />
           <line x1="520" y1="0" x2="520" y2="250" stroke="#8d979f" strokeOpacity=".45" strokeWidth="1" strokeDasharray="3 4" />
-          <circle cx="520" cy="146" r="4" fill={color.bg} stroke={color.text} strokeWidth="2" />
+          <circle className="dt-chart-fill" style={{ animationDelay: "1.1s" }} cx="520" cy="146" r="4" fill={color.bg} stroke={color.text} strokeWidth="2" />
         </svg>
         <span
           style={{
@@ -268,7 +384,7 @@ function TwinDivergenceChart() {
             left: 6,
             top: 32,
             fontFamily: font.mono,
-            fontSize: 9.5,
+            fontSize: 11,
             color: color.dangerSoft,
             letterSpacing: "0.04em",
             whiteSpace: "nowrap",
@@ -283,7 +399,7 @@ function TwinDivergenceChart() {
             left: "64.5%",
             top: 6,
             fontFamily: font.mono,
-            fontSize: 9.5,
+            fontSize: 11,
             color: color.textDim,
             letterSpacing: "0.04em",
             whiteSpace: "nowrap",
@@ -293,7 +409,7 @@ function TwinDivergenceChart() {
           ANOMALY ONSET 01:38:26
         </span>
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 9.5, color: color.textLabel3 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 11, color: color.textLabel3 }}>
         {["01:12", "01:18", "01:24", "01:30", "01:36", "01:42"].map((t) => (
           <span key={t}>{t}</span>
         ))}
@@ -304,7 +420,7 @@ function TwinDivergenceChart() {
 
 function LegendSwatch({ color: swatchColor, label }: { color: string; label: string }) {
   return (
-    <span style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: font.mono, fontSize: 10, color: "#97a1a8" }}>
+    <span style={{ display: "flex", alignItems: "center", gap: 7, fontFamily: font.mono, fontSize: 11.5, color: "#97a1a8" }}>
       <span style={{ width: 13, height: 2, background: swatchColor }} />
       {label}
     </span>
@@ -317,14 +433,16 @@ function QuickStatsSection() {
       style={{
         display: "grid",
         gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+        gap: 18,
+        padding: "22px 30px",
         borderBottom: `1px solid ${color.border}`,
         flex: "0 0 auto",
       }}
     >
-      <QuickStat label="HEALTH INDEX" value="62" unit="/100" valueColor={color.danger} note="▼ 14 in 30 min" noteColor={color.dangerSoft} bordered />
-      <QuickStat label="ENGINE SPEED" value="5 240" unit="RPM" valueColor={color.accent} note="MAP 27.4 inHg · 68% pwr" noteColor={color.textLabel} bordered />
-      <QuickStat label="PEAK CHT · CYL 3" value="248" unit="°C" valueColor={color.danger} note="redline 260 · exceeded 2×" noteColor={color.dangerSoft} bordered />
-      <QuickStat label="MISSION RELIABILITY" value="71" unit="%" valueColor={color.accent} note="endurance 6.2 h left" noteColor={color.textLabel} />
+      <QuickStat label="HEALTH INDEX" value="62" unit="/100" valueColor={color.danger} note="▼ 14 in 30 min" noteColor={color.dangerSoft} />
+      <QuickStat label="ENGINE SPEED" value="5 240" unit="RPM" valueColor={color.accent} note="MAP 27.4 inHg · 68% pwr" noteColor={color.textMuted} />
+      <QuickStat label="PEAK CHT · CYL 3" value="248" unit="°C" valueColor={color.danger} note="redline 260 · exceeded 2×" noteColor={color.dangerSoft} />
+      <QuickStat label="MISSION RELIABILITY" value="71" unit="%" valueColor={color.accent} note="endurance 6.2 h left" noteColor={color.textMuted} />
     </section>
   );
 }
@@ -336,7 +454,6 @@ function QuickStat({
   valueColor,
   note,
   noteColor,
-  bordered,
 }: {
   label: string;
   value: string;
@@ -344,28 +461,30 @@ function QuickStat({
   valueColor: string;
   note: string;
   noteColor: string;
-  bordered?: boolean;
 }) {
   return (
     <div
+      className="dt-glow-card"
       style={{
-        padding: "22px 26px 24px 30px",
-        borderRight: bordered ? `1px solid ${color.border}` : undefined,
+        padding: "24px 26px 26px 26px",
+        border: `1px solid ${color.border}`,
+        background: color.panelBgAlt,
         display: "flex",
         flexDirection: "column",
         gap: 10,
+        ...glowVars(valueColor === color.danger),
       }}
     >
-      <div style={{ fontFamily: font.mono, fontSize: 9.5, color: color.textLabel, letterSpacing: "0.12em" }}>
+      <div style={{ fontFamily: font.mono, fontSize: 11.5, fontWeight: 600, color: color.textMuted, letterSpacing: "0.1em" }}>
         {label}
       </div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
         <span style={{ fontFamily: font.mono, fontSize: 38, fontWeight: 600, lineHeight: 1, color: valueColor }}>
           {value}
         </span>
-        <span style={{ fontFamily: font.mono, fontSize: 12, color: color.textLabel }}>{unit}</span>
+        <span style={{ fontFamily: font.mono, fontSize: 13, color: color.textMuted }}>{unit}</span>
       </div>
-      <div style={{ fontFamily: font.mono, fontSize: 10.5, color: noteColor }}>{note}</div>
+      <div style={{ fontFamily: font.mono, fontSize: 12.5, fontWeight: 500, color: noteColor }}>{note}</div>
     </div>
   );
 }
@@ -376,6 +495,8 @@ function DetailSection() {
       style={{
         display: "grid",
         gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)",
+        gap: 18,
+        padding: "0 30px 22px 30px",
         borderBottom: `1px solid ${color.border}`,
         flex: "0 0 auto",
       }}
@@ -389,10 +510,21 @@ function DetailSection() {
 
 function PerCylinderThermals() {
   return (
-    <div style={{ padding: "26px 26px 28px 30px", borderRight: `1px solid ${color.border}`, display: "flex", flexDirection: "column", gap: 18 }}>
+    <div
+      className="dt-glow-card"
+      style={{
+        padding: "28px 28px 30px 28px",
+        border: `1px solid ${color.border}`,
+        background: color.panelBgAlt,
+        display: "flex",
+        flexDirection: "column",
+        gap: 18,
+        ...glowVars(CYLINDERS.some((c) => c.critical)),
+      }}
+    >
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>Per-cylinder thermals</div>
-        <div style={{ fontFamily: font.mono, fontSize: 10, color: color.textLabel, letterSpacing: "0.05em" }}>
+        <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.textLabel, letterSpacing: "0.05em" }}>
           CHT / EGT · °C
         </div>
       </div>
@@ -423,15 +555,17 @@ function PerCylinderThermals() {
               style={{
                 height: 3,
                 borderRadius: 2,
-                background: cyl.critical ? "#2a1c1b" : "#1f252a",
+                background: cyl.critical ? "rgba(255,77,61,.16)" : color.border,
                 overflow: "hidden",
               }}
             >
               <div
+                className="dt-bar-fill-x"
                 style={{
                   width: `${cyl.pct}%`,
                   height: "100%",
                   background: cyl.critical ? color.danger : color.accentDim,
+                  animationDelay: `${i * 0.08}s`,
                 }}
               />
             </div>
@@ -453,7 +587,7 @@ function PerCylinderThermals() {
           display: "flex",
           justifyContent: "space-between",
           fontFamily: font.mono,
-          fontSize: 10,
+          fontSize: 11.5,
           color: color.textLabel,
           borderTop: `1px solid ${color.border}`,
           paddingTop: 13,
@@ -493,21 +627,48 @@ function VibrationSignature() {
   const bars = VIB_BARS;
 
   return (
-    <div style={{ padding: "26px 26px 28px 26px", borderRight: `1px solid ${color.border}`, display: "flex", flexDirection: "column", gap: 18 }}>
+    <div
+      className="dt-glow-card"
+      style={{
+        padding: "28px 28px 30px 28px",
+        border: `1px solid ${color.border}`,
+        background: color.panelBgAlt,
+        display: "flex",
+        flexDirection: "column",
+        gap: 18,
+        ...glowVars(true),
+      }}
+    >
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>Vibration signature</div>
-        <div style={{ fontFamily: font.mono, fontSize: 10, color: color.textLabel, letterSpacing: "0.05em" }}>
+        <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.textLabel, letterSpacing: "0.05em" }}>
           FFT · 0–500 HZ · g RMS
         </div>
       </div>
       <div style={{ position: "relative", width: "100%" }}>
         <svg viewBox="0 0 300 128" preserveAspectRatio="none" style={{ width: "100%", height: 128, display: "block" }}>
           <g fill="#3a4348">
-            {bars.map((b) => (
-              <rect key={b.x} x={b.x} y={128 - b.h} width="9" height={b.h} />
+            {bars.map((b, i) => (
+              <rect
+                key={b.x}
+                className="dt-bar-fill-y"
+                style={{ transformBox: "fill-box", animationDelay: `${i * 0.025}s` }}
+                x={b.x}
+                y={128 - b.h}
+                width="9"
+                height={b.h}
+              />
             ))}
           </g>
-          <rect x="116" y="28" width="9" height="100" fill={color.danger} />
+          <rect
+            className="dt-bar-fill-y"
+            style={{ transformBox: "fill-box", animationDelay: "0.55s" }}
+            x="116"
+            y="28"
+            width="9"
+            height="100"
+            fill={color.danger}
+          />
         </svg>
         <span
           style={{
@@ -515,7 +676,7 @@ function VibrationSignature() {
             left: "43%",
             top: 12,
             fontFamily: font.mono,
-            fontSize: 9.5,
+            fontSize: 11,
             color: color.dangerSoft,
             pointerEvents: "none",
           }}
@@ -533,7 +694,18 @@ function VibrationSignature() {
 
 function SubsystemHealth() {
   return (
-    <div style={{ padding: "26px 30px 28px 26px", display: "flex", flexDirection: "column", gap: 16 }}>
+    <div
+      className="dt-glow-card"
+      style={{
+        padding: "28px 28px 30px 28px",
+        border: `1px solid ${color.border}`,
+        background: color.panelBgAlt,
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        ...glowVars(SUBSYSTEMS.some((s) => s.critical)),
+      }}
+    >
       <div style={{ fontSize: 14, fontWeight: 600 }}>Sub-system health</div>
       <div style={{ display: "flex", flexDirection: "column" }}>
         {SUBSYSTEMS.map((s, i) => (
@@ -560,7 +732,7 @@ function SubsystemHealth() {
           display: "flex",
           justifyContent: "space-between",
           fontFamily: font.mono,
-          fontSize: 10,
+          fontSize: 11.5,
           color: color.textLabel,
           borderTop: `1px solid ${color.border}`,
           paddingTop: 13,
@@ -584,14 +756,14 @@ function BottomSection({ onWhyThisPrediction }: { onWhyThisPrediction: () => voi
 
 function AiDiagnosticSummary({ onWhyThisPrediction }: { onWhyThisPrediction: () => void }) {
   return (
-    <div style={{ padding: "26px 30px 30px 30px", borderRight: `1px solid ${color.border}`, display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ padding: "30px 34px 34px 34px", borderRight: `1px solid ${color.border}`, display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>AI diagnostic summary</div>
         <div style={{ flex: "1 1 auto" }} />
         <span
           style={{
             fontFamily: font.mono,
-            fontSize: 9.5,
+            fontSize: 11,
             color: color.accent,
             border: "1px solid #24382f",
             padding: "3px 7px",
@@ -607,7 +779,7 @@ function AiDiagnosticSummary({ onWhyThisPrediction }: { onWhyThisPrediction: () 
         sensor drift. CHT and ionisation channels agree independently while the combustion model does not. Onset
         correlates with the third rapid throttle transition at 01:36.
       </div>
-      <div style={{ fontFamily: font.mono, fontSize: 10.5, color: color.textLabel, letterSpacing: "0.04em" }}>
+      <div style={{ fontFamily: font.mono, fontSize: 12, color: color.textLabel, letterSpacing: "0.04em" }}>
         RULED OUT · SENSOR DRIFT · LUBRICATION · IGNITION COIL
       </div>
       <button
@@ -634,10 +806,10 @@ function AiDiagnosticSummary({ onWhyThisPrediction }: { onWhyThisPrediction: () 
 
 function AnomalyFeed() {
   return (
-    <div style={{ padding: "26px 30px 30px 26px", display: "flex", flexDirection: "column", gap: 14 }}>
+    <div style={{ padding: "30px 34px 34px 30px", display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ fontSize: 14, fontWeight: 600 }}>Anomaly feed</div>
-        <span style={{ fontFamily: font.mono, fontSize: 9.5, color: color.textLabel, letterSpacing: "0.1em" }}>
+        <span style={{ fontFamily: font.mono, fontSize: 11, color: color.textLabel, letterSpacing: "0.1em" }}>
           LIVE
         </span>
       </div>
@@ -645,7 +817,7 @@ function AnomalyFeed() {
         <div key={a.title} style={{ display: "flex", gap: 13, padding: "12px 0", borderTop: `1px solid ${color.borderSoft}` }}>
           <span style={{ width: 5, height: 5, borderRadius: "50%", background: a.dot, marginTop: 6, flex: "0 0 5px" }} />
           <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: a.dim ? "#8d979f" : undefined }}>{a.title}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: a.dim ? color.textInactive : undefined }}>{a.title}</div>
             <div style={{ fontSize: 11.5, color: color.textFaint }}>{a.detail}</div>
           </div>
         </div>
