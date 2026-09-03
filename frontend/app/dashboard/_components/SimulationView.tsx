@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { altLabel, chtLabel, hms, mixLabel, oatLabel, rpmLabel } from "../_lib/format";
-import { cardTabStyle, color, font, tabStyle } from "../_lib/tokens";
+import { cardTabStyle, color, font, glowVars, tabStyle } from "../_lib/tokens";
 import { SCENARIOS, SIM_RUN_LENGTH, type Camera, type SimParams, type XaiTab } from "../_lib/state";
 
 const SPEEDS = [1, 2, 5, 10] as const;
@@ -145,7 +145,7 @@ function ScenarioPanel({
               }}
             >
               <div style={{ fontSize: 12.5, fontWeight: 600, color: t.fg }}>{s.title}</div>
-              <div style={{ fontFamily: font.mono, fontSize: 9.5, color: color.textLabel }}>{s.subtitle}</div>
+              <div style={{ fontFamily: font.mono, fontSize: 11, color: color.textLabel }}>{s.subtitle}</div>
             </div>
           );
         })}
@@ -154,7 +154,7 @@ function ScenarioPanel({
       <div style={{ display: "flex", flexDirection: "column", gap: 15, borderTop: `1px solid ${color.border}`, paddingTop: 20, flex: "0 0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <SectionLabel>PARAMETERS</SectionLabel>
-          <span onClick={onResetParams} style={{ fontFamily: font.mono, fontSize: 9.5, color: "#8aa8a3", cursor: "pointer" }}>
+          <span onClick={onResetParams} style={{ fontFamily: font.mono, fontSize: 11, color: "#8aa8a3", cursor: "pointer" }}>
             RESET
           </span>
         </div>
@@ -186,7 +186,7 @@ function ScenarioPanel({
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ fontFamily: font.mono, fontSize: 9.5, color: color.textLabel2, letterSpacing: "0.13em" }}>
+    <div style={{ fontFamily: font.mono, fontSize: 11, color: color.textLabel2, letterSpacing: "0.13em" }}>
       {children}
     </div>
   );
@@ -232,7 +232,7 @@ function ParamSlider({
 
 function SyncRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 10.5, color: color.textLabel }}>
+    <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 12, color: color.textLabel }}>
       <span>{label}</span>
       <span style={{ color: color.accent }}>{value}</span>
     </div>
@@ -346,7 +346,7 @@ function Viewport({
           <div
             className="dt-fade-swap"
             key={camera}
-            style={{ fontFamily: font.mono, fontSize: 10, color: color.textLabel3, letterSpacing: "0.08em" }}
+            style={{ fontFamily: font.mono, fontSize: 11.5, color: color.textLabel3, letterSpacing: "0.08em" }}
           >
             MALE UAV AIRFRAME · {CAMERA_VIEW_LABEL[camera]} · CLICK TO CAPTURE INPUT
           </div>
@@ -359,7 +359,7 @@ function Viewport({
               alignItems: "center",
               gap: 7,
               fontFamily: font.mono,
-              fontSize: 9.5,
+              fontSize: 11,
               color: color.dangerSoft,
               background: "rgba(11,13,15,.86)",
               border: "1px solid #3d1f1c",
@@ -373,7 +373,7 @@ function Viewport({
           <span
             style={{
               fontFamily: font.mono,
-              fontSize: 9.5,
+              fontSize: 11,
               color: color.textMuted,
               background: "rgba(11,13,15,.86)",
               border: "1px solid #232a2f",
@@ -395,7 +395,7 @@ function Viewport({
                 className="dt-tab"
                 style={{
                   fontFamily: font.mono,
-                  fontSize: 9.5,
+                  fontSize: 11,
                   padding: "6px 9px",
                   borderRadius: 4,
                   cursor: "pointer",
@@ -443,7 +443,7 @@ function Viewport({
           padding: "14px 16px",
           borderRadius: 11,
           background: color.panelBgAlt,
-          border: "1px solid #1f252a",
+          border: `1px solid ${color.border}`,
           display: "flex",
           flexDirection: "column",
           gap: 12,
@@ -474,7 +474,7 @@ function Viewport({
             </div>
             <TransportButton onClick={() => onSeek(Math.min(SIM_RUN_LENGTH, t + 30))}>▶▶</TransportButton>
           </div>
-          <div style={{ display: "flex", gap: 2, padding: 3, background: "#14181b", border: "1px solid #1f252a", borderRadius: 7 }}>
+          <div style={{ display: "flex", gap: 2, padding: 3, background: color.wellBg, border: `1px solid ${color.border}`, borderRadius: 7 }}>
             {SPEEDS.map((s) => {
               const st = tabStyle(speed === s);
               return (
@@ -486,7 +486,7 @@ function Viewport({
                     padding: "5px 9px",
                     borderRadius: 4,
                     fontFamily: font.mono,
-                    fontSize: 10.5,
+                    fontSize: 12,
                     cursor: "pointer",
                     background: st.bg,
                     color: st.fg,
@@ -498,7 +498,7 @@ function Viewport({
             })}
           </div>
           <div style={{ flex: "1 1 auto" }} />
-          <div style={{ fontFamily: font.mono, fontSize: 10.5, color: color.textLabel }}>
+          <div style={{ fontFamily: font.mono, fontSize: 12, color: color.textLabel }}>
             T+{hms(t)} / 02:15:00
           </div>
           <button
@@ -526,6 +526,8 @@ function Viewport({
         >
           <svg viewBox="0 0 900 40" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" }}>
             <polyline
+              className="dt-chart-line"
+              pathLength="1"
               points="0,31 60,29 120,30 180,27 240,28 300,26 360,25 420,23 480,19 540,14 600,10 660,8 720,7 780,6 840,6 900,5"
               fill="none"
               stroke={color.accentDim}
@@ -548,10 +550,10 @@ function Viewport({
               left: `calc(${pct}% - 4px)`,
             }}
           />
-          <div style={{ position: "absolute", left: 486, top: 5, fontFamily: font.mono, fontSize: 8.5, color: color.textMuted }}>
+          <div style={{ position: "absolute", left: 486, top: 5, fontFamily: font.mono, fontSize: 11.5, color: color.textMuted }}>
             ONSET
           </div>
-          <div style={{ position: "absolute", left: 626, top: 5, fontFamily: font.mono, fontSize: 8.5, color: color.dangerSoft }}>
+          <div style={{ position: "absolute", left: 626, top: 5, fontFamily: font.mono, fontSize: 11.5, color: color.dangerSoft }}>
             MISFIRE
           </div>
         </div>
@@ -598,7 +600,7 @@ function HudTile({ label, value, danger }: { label: string; value: string; dange
         gap: 2,
       }}
     >
-      <span style={{ fontFamily: font.mono, fontSize: 8.5, color: color.textLabel, letterSpacing: "0.1em" }}>
+      <span style={{ fontFamily: font.mono, fontSize: 11.5, color: color.textLabel, letterSpacing: "0.1em" }}>
         {label}
       </span>
       <span style={{ fontFamily: font.mono, fontSize: 15, fontWeight: 600, color: danger ? color.danger : color.accent }}>
@@ -634,7 +636,7 @@ function TelemetryPanel({ params, xai, onXaiChange }: { params: SimParams; xai: 
 
       <div style={{ padding: "20px 18px 18px 18px", borderBottom: `1px solid ${color.border}`, display: "flex", flexDirection: "column", gap: 12, flex: "0 0 auto" }}>
         <SectionLabel>LIVE CHANNELS</SectionLabel>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, background: color.border, border: `1px solid ${color.border}`, borderRadius: 7, overflow: "hidden" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <ChannelTile label="RPM" value={rpmLabel(params.throttle)} />
           <ChannelTile label="MAP" value="27.4 inHg" />
           <ChannelTile label="OIL PRESS" value="3.9 bar" />
@@ -647,25 +649,34 @@ function TelemetryPanel({ params, xai, onXaiChange }: { params: SimParams; xai: 
       <div style={{ padding: "20px 18px 18px 18px", borderBottom: `1px solid ${color.border}`, display: "flex", flexDirection: "column", gap: 12, flex: "0 0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <SectionLabel>PREDICTED FAULTS</SectionLabel>
-          <span style={{ fontFamily: font.mono, fontSize: 9.5, color: color.textLabel }}>RUL</span>
+          <span style={{ fontFamily: font.mono, fontSize: 11, color: color.textLabel }}>RUL</span>
         </div>
-        {PREDICTED_FAULTS.map((f, i) => (
-          <div key={f.title}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-                <span style={{ fontSize: 12.5, fontWeight: 600, color: f.color }}>{f.title}</span>
-                <span style={{ fontFamily: font.mono, fontSize: 12.5, fontWeight: 600, color: f.rulColor }}>{f.rul}</span>
-              </div>
-              <div style={{ fontFamily: font.mono, fontSize: 9.5, color: color.textLabel }}>{f.conf}</div>
+        {PREDICTED_FAULTS.map((f) => (
+          <div
+            key={f.title}
+            className="dt-glow-card"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 5,
+              padding: "12px 14px",
+              border: `1px solid ${color.border}`,
+              background: color.panelBgAlt,
+              ...glowVars(f.rulColor === color.danger),
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: f.color }}>{f.title}</span>
+              <span style={{ fontFamily: font.mono, fontSize: 12.5, fontWeight: 600, color: f.rulColor }}>{f.rul}</span>
             </div>
-            {i < PREDICTED_FAULTS.length - 1 && <div style={{ height: 1, background: color.borderSoft, marginTop: 12 }} />}
+            <div style={{ fontFamily: font.mono, fontSize: 11, color: color.textLabel }}>{f.conf}</div>
           </div>
         ))}
       </div>
 
       <div style={{ padding: "20px 18px 28px 18px", display: "flex", flexDirection: "column", gap: 12, flex: "0 0 auto" }}>
         <SectionLabel>WHY</SectionLabel>
-        <div style={{ display: "flex", gap: 2, padding: 3, background: "#14181b", border: "1px solid #1f252a", borderRadius: 7 }}>
+        <div style={{ display: "flex", gap: 2, padding: 3, background: color.wellBg, border: `1px solid ${color.border}`, borderRadius: 7 }}>
           {XAI_TABS.map(({ key, label }) => {
             const t = tabStyle(xai === key);
             return (
@@ -710,8 +721,19 @@ function SyncRowLight({ label, value }: { label: string; value: string }) {
 
 function ChannelTile({ label, value, danger }: { label: string; value: string; danger?: boolean }) {
   return (
-    <div style={{ background: color.panelBg, padding: "10px 11px", display: "flex", flexDirection: "column", gap: 3 }}>
-      <span style={{ fontFamily: font.mono, fontSize: 8.5, color: color.textLabel, letterSpacing: "0.09em" }}>
+    <div
+      className="dt-glow-card"
+      style={{
+        background: color.panelBgAlt,
+        border: `1px solid ${color.border}`,
+        padding: "10px 11px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+        ...glowVars(!!danger),
+      }}
+    >
+      <span style={{ fontFamily: font.mono, fontSize: 11.5, color: color.textLabel, letterSpacing: "0.09em" }}>
         {label}
       </span>
       <span style={{ fontFamily: font.mono, fontSize: 14, fontWeight: 600, color: danger ? color.danger : color.accent }}>
@@ -742,7 +764,7 @@ function XaiDrivers() {
           <span style={{ fontFamily: font.mono, textAlign: "right", color: d.color }}>{d.value}</span>
         </div>
       ))}
-      <div style={{ fontFamily: font.mono, fontSize: 9, color: color.textLabel3 }}>SHAP ATTRIBUTION · 120 s WINDOW</div>
+      <div style={{ fontFamily: font.mono, fontSize: 10.5, color: color.textLabel3 }}>SHAP ATTRIBUTION · 120 s WINDOW</div>
     </div>
   );
 }
@@ -756,6 +778,8 @@ function XaiResidual() {
           <rect x="0" y="80" width="300" height="16" fill="rgba(79,179,145,.12)" />
           <line x1="0" y1="58" x2="300" y2="58" stroke={color.danger} strokeOpacity=".35" strokeDasharray="4 4" strokeWidth="1" />
           <polyline
+            className="dt-chart-line"
+            pathLength="1"
             points="0,86 25,89 50,85 75,90 100,84 125,87 150,80 175,72 200,62 225,50 250,38 275,28 300,22"
             fill="none"
             stroke={color.danger}
@@ -768,7 +792,7 @@ function XaiResidual() {
             left: 4,
             top: 40,
             fontFamily: font.mono,
-            fontSize: 9,
+            fontSize: 10.5,
             color: color.dangerSoft,
             whiteSpace: "nowrap",
             pointerEvents: "none",
@@ -781,7 +805,7 @@ function XaiResidual() {
         Twin predicts 704 °C, engine reports 838 °C. Residual leaves the noise band at T+01:38 and grows
         monotonically, a physics mismatch rather than measurement noise.
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 9, color: color.textLabel3 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 10.5, color: color.textLabel3 }}>
         <span>HYBRID THERMO + GRU</span>
         <span>R² 0.981</span>
       </div>
@@ -798,7 +822,7 @@ function XaiReasoning() {
         points to restricted spray from a coked injector rather than ignition or sensor failure.
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6, borderTop: `1px solid ${color.borderSoft}`, paddingTop: 12 }}>
-        <span style={{ fontFamily: font.mono, fontSize: 9, color: color.textLabel3, letterSpacing: "0.1em" }}>
+        <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.textLabel3, letterSpacing: "0.1em" }}>
           MAINTENANCE ADVISORY
         </span>
         <span style={{ fontSize: 12.5, color: color.text, lineHeight: 1.55 }}>
