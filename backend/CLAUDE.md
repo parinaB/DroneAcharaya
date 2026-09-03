@@ -12,10 +12,10 @@ actually built here and the conventions for extending it.
 | [`app/db/`](app/db/) | SQLAlchemy models + the write path (the recorder — see below). |
 | [`migrations/`](migrations/) | Alembic migrations. Driven by `app.core.config.Settings.database_url`, not a hardcoded URL in `alembic.ini`. |
 | [`app/modules/replay/`](app/modules/replay/) | Session lifecycle (start/stop/status/latest) wrapping the bridge. |
-| [`app/modules/inference/`](app/modules/inference/) | `HealthScoreOut` — today a ground-truth stand-in, later a real model, same shape either way. |
+| [`app/modules/inference/`](app/modules/inference/) | `HealthScoreOut` — `lstm_rul`'s health+RUL heads and `xgboost_classifier`'s sensor-fault fields once each model's own rolling window fills, `autoencoder`'s row-level anomaly score on every scoreable frame, ground-truth stand-in / `null` before/without that (or if an artifact isn't present). |
 | [`app/modules/advisory/`](app/modules/advisory/) | Explicit placeholder — no rule set exists anywhere in the repo yet. |
 | [`app/modules/ingestion/`](app/modules/ingestion/) | Reports bridge/session state. Only means "current live feed health" once a real ECU source exists — right now it's just replay activity. |
-| [`app/core/`](app/core/) | Settings (env-driven), logging, `model_loader.py` (still `NotImplementedError` — Phase 7, not started). |
+| [`app/core/`](app/core/) | Settings (env-driven), logging, `model_loader.py` (loads `lstm_rul`, `xgboost_classifier`, and `autoencoder`; `digital_twin` remains `NotImplementedError` via `load_model()`'s generic dispatch since it's only ever consumed as a dependency of the autoencoder's residual features via `ml/features/feature_engineering.py`'s own cached loader, never loaded standalone). |
 
 ## Architecture
 
@@ -37,20 +37,70 @@ is explicitly stubbed (`NotImplementedError`, same pattern as
 `model_loader.py`) since no live CAN-bus ECU source exists to frame yet —
 don't build this speculatively; wire it when a real source needs it.
 
-**Inference is a ground-truth stand-in, not a model, and that's
-deliberate.** `app/modules/inference/service.py`'s `get_health_score()`
-tries `model_loader.load_model()` first (always raises `NotImplementedError`
-today — Phase 7 hasn't started); on that exception it falls through to
-`ground_truth_health_score()`, which maps a run's `fault_class` to its
-`contract/health-parameter-registry.md` health column via `HEALTH_COLUMNS`
-and computes `health_index`/`fault_probability` from it — respecting the
-registry's two directions (`_health`: 1.0 healthy → 0.0 failed; `_deg`/rate
-columns: inverted, 0.0 healthy → 1.0 failed). `HealthScoreOut` fixes the
-field set now — wiring in real `ml/artifacts/` later only changes which
-branch populates it and flips `source` from `"ground_truth"` to `"model"`,
-never the shape. **`rul_estimate_hours` is always `None`** — no RUL formula
-is formalized anywhere upstream yet (`data/README.md` says so explicitly);
-don't invent one here.
+**Inference runs the real `lstm_rul` model once a session's rolling window
+fills, and falls back to a ground-truth stand-in before that (Phase 7).**
+`BridgeService` keeps the last `LSTM_SEQ_LEN` (60) frames in memory per
+session; `app/modules/inference/service.py`'s `get_health_score()` runs
+`EngineMultiHeadLSTM`'s health + RUL heads once that window is full
+(offloaded via `asyncio.to_thread` so a forward pass never blocks the
+bridge's event loop), producing `fault_type`/`health_index` via the same
+worst-column-wins aggregation `HEALTH_COLUMNS` uses for ground truth, just
+fed the model's predicted 16 health values instead. Before the window fills
+(first 59 frames of a session), or if no `ml/artifacts/lstm_rul/<version>/`
+is present, it falls through to `ground_truth_health_score()`, which maps a
+run's `fault_class` to its `contract/health-parameter-registry.md` health
+column via `HEALTH_COLUMNS` — respecting the registry's two directions
+(`_health`: 1.0 healthy → 0.0 failed; `_deg`/rate columns: inverted, 0.0
+healthy → 1.0 failed). `HealthScoreOut` fixes the field set — the model
+path only changes which branch populates it and flips `source` from
+`"ground_truth"` to `"model"`, plus sets `model_version`/`forecast_horizon_s`
+(60.0 for `lstm_rul`, since it forecasts state 60s *after* its input
+window's last frame — see `ml/training/lstm_rul/README.md`).
+**`lstm_rul`'s own sensor-fault head is deliberately NOT used** — its
+README documents a precision collapse (a `WeightedRandomSampler` regression)
+and says not to wire it in as-is; `fault_type`/`fault_probability` in the
+model path come from the health head's worst-column only.
+**`rul_estimate_hours` is real once the model path is active**; it's `None`
+only in the ground-truth stand-in path, where no RUL formula exists.
+
+**`xgboost_classifier`'s per-channel sensor-fault classification is also
+wired**, independently of the `lstm_rul` branch above — `sensor_fault_cht_c3`
+and `sensor_fault_bearing_vibration` are computed off the *same* rolling
+frame buffer `BridgeService` keeps for `lstm_rul`, but gated on their own
+much shorter threshold (`XGB_ROLLING_WINDOW`, 10 frames vs. `lstm_rul`'s 60),
+so they start populating well before `lstm_rul`'s fields do. This is a
+**different class vocabulary** from `fault_type`
+(`NONE`/`BIAS`/`DRIFT`/`NOISE`/`STUCK` for `cht_c3`,
+`NONE`/`DROPOUT` for `bearing_vibration` — see
+`ml/artifacts/xgboost_classifier/v1/metadata.json`'s `label_remapping`) and
+is **never merged into `fault_type`** — see `HealthScoreOut`'s own field
+comments. `xgboost_classifier`'s fitted `StandardScaler`/`OneHotEncoder`
+were never exported alongside its model files, so `model_loader.py`
+deliberately runs it on **raw, unscaled features** instead (tree-based
+models don't need scaling to split correctly, unlike `lstm_rul` where the
+scaler is load-bearing) — see that module's docstring for the full
+reasoning, including how the `engine_state` one-hot category list was
+reconstructed from the training notebook's own printed output rather than a
+fitted encoder.
+
+**`autoencoder`'s reconstruction-error anomaly score is also wired**, a
+*third* independent signal (`anomaly_score`/`is_anomalous`/
+`anomaly_model_version`) alongside `lstm_rul`'s health/fault/RUL fields and
+`xgboost_classifier`'s `sensor_fault_*` fields — never merged with either.
+Unlike those two, it's **row-level** (`ml/training/autoencoder/README.md`'s
+"Row-level (flat)" design): no rolling window is buffered for it, it scores
+every frame `BridgeService` sees via
+`app/modules/inference/autoencoder_features.py`'s
+`build_autoencoder_features()`, which reruns
+`ml/features/feature_engineering.py`'s `physics_residuals()` on that single
+frame using `ml/artifacts/digital_twin/v3/`'s 27 per-channel regressors
+(now present in this repo, paired with `autoencoder/v3` — mixing versions
+silently produces garbage, see that model's README). Returns `null` for a
+frame whose `engine_state` is a gated transient
+(`STARTING`/`SHUTDOWN`/`THROTTLE_TRANSIENT`) or where a needed channel is
+NaN (e.g. vibration outside its sidecar-active states) — same honest-gap
+convention `xgboost_classifier`'s pre-window-fill `null`s use, just gated on
+a different condition.
 
 **No TimescaleDB.** `app/db/models.py` has zero hypertable/partitioning
 calls — decided when the deployment target became Render + Supabase (free

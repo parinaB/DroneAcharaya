@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Sidebar } from "./_components/Sidebar";
 import { TopBar } from "./_components/TopBar";
 import { LiveDashboard } from "./_components/LiveDashboard";
+import { LiveModelPanel } from "./_components/LiveModelPanel";
 import { SimulationView } from "./_components/SimulationView";
 import { LoadingScreen } from "./_components/LoadingScreen";
 import { hms } from "./_lib/format";
@@ -89,12 +90,15 @@ export default function DashboardPage() {
 
           <div key={screen} className="dt-screen-enter" style={{ flex: "1 1 auto", display: "flex", minHeight: 0 }}>
             {screen === "dashboard" ? (
-              <LiveDashboard
-                acknowledged={acknowledged}
-                onAcknowledge={() => setAcknowledged((a) => !a)}
-                onOpenPrediction={openPrediction}
-                onWhyThisPrediction={whyThisPrediction}
-              />
+              <div style={{ flex: "1 1 auto", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, overflow: "hidden" }}>
+                <LiveModelPanel />
+                <LiveDashboard
+                  acknowledged={acknowledged}
+                  onAcknowledge={() => setAcknowledged((a) => !a)}
+                  onOpenPrediction={openPrediction}
+                  onWhyThisPrediction={whyThisPrediction}
+                />
+              </div>
             ) : (
               <SimulationView
                 scenario={scenario}

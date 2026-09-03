@@ -1,0 +1,184 @@
+{
+  "condition_features": [
+    "rpm",
+    "throttle",
+    "altitude",
+    "ambient_temperature",
+    "air_density"
+  ],
+  "target_channels": [
+    "torque",
+    "power",
+    "cht_c1",
+    "cht_c2",
+    "cht_c3",
+    "cht_c4",
+    "egt_c1",
+    "egt_c2",
+    "egt_c3",
+    "egt_c4",
+    "oil_pressure",
+    "oil_temperature",
+    "fuel_flow",
+    "rail_pressure",
+    "injection_timing",
+    "boost_pressure",
+    "map",
+    "intake_temperature",
+    "air_mass_flow",
+    "coolant_temperature",
+    "vibration_rms_x",
+    "vibration_order_1x",
+    "vibration_rms_x_bearing_proxy",
+    "vibration_order_1x_bearing_proxy",
+    "battery_voltage",
+    "battery_current",
+    "alternator_power"
+  ],
+  "gated_out_states": [
+    "SHUTDOWN",
+    "STARTING",
+    "THROTTLE_TRANSIENT"
+  ],
+  "n_train_runs": 600,
+  "n_eval_runs": 106,
+  "dataset": "data/processed/sih_data_v3",
+  "seed": 42,
+  "metrics": {
+    "torque": {
+      "mae": 1.338997557263353,
+      "rmse": 1.7773504612866642,
+      "n_eval": 195599
+    },
+    "power": {
+      "mae": 0.3834419193500856,
+      "rmse": 0.5168392046600991,
+      "n_eval": 195599
+    },
+    "cht_c1": {
+      "mae": 10.631875354259986,
+      "rmse": 14.564372024111465,
+      "n_eval": 195599
+    },
+    "cht_c2": {
+      "mae": 10.631875354259986,
+      "rmse": 14.564372024111465,
+      "n_eval": 195599
+    },
+    "cht_c3": {
+      "mae": 14.404112536723567,
+      "rmse": 18.962181741480848,
+      "n_eval": 195599
+    },
+    "cht_c4": {
+      "mae": 10.631875354259986,
+      "rmse": 14.564372024111465,
+      "n_eval": 195599
+    },
+    "egt_c1": {
+      "mae": 5.90040522442183,
+      "rmse": 25.682054585822193,
+      "n_eval": 195599
+    },
+    "egt_c2": {
+      "mae": 5.90040522442183,
+      "rmse": 25.682054585822193,
+      "n_eval": 195599
+    },
+    "egt_c3": {
+      "mae": 5.90040522442183,
+      "rmse": 25.682054585822193,
+      "n_eval": 195599
+    },
+    "egt_c4": {
+      "mae": 5.90040522442183,
+      "rmse": 25.682054585822193,
+      "n_eval": 195599
+    },
+    "oil_pressure": {
+      "mae": 0.0020230832533534335,
+      "rmse": 0.006833872010512276,
+      "n_eval": 195599
+    },
+    "oil_temperature": {
+      "mae": 5.517902232944094,
+      "rmse": 7.492486872370379,
+      "n_eval": 195599
+    },
+    "fuel_flow": {
+      "mae": 0.07819270095315144,
+      "rmse": 0.27104801029125114,
+      "n_eval": 195599
+    },
+    "rail_pressure": {
+      "mae": 4.367546335918101,
+      "rmse": 20.566089192569827,
+      "n_eval": 195599
+    },
+    "injection_timing": {
+      "mae": 0.0436701330819125,
+      "rmse": 0.20565798523808082,
+      "n_eval": 195599
+    },
+    "boost_pressure": {
+      "mae": 0.005302576548755041,
+      "rmse": 0.00725823216682354,
+      "n_eval": 195599
+    },
+    "map": {
+      "mae": 0.6659700348216181,
+      "rmse": 0.9057010733063533,
+      "n_eval": 195599
+    },
+    "intake_temperature": {
+      "mae": 0.48038607021811874,
+      "rmse": 0.6617324616879261,
+      "n_eval": 195599
+    },
+    "air_mass_flow": {
+      "mae": 0.000535406519973322,
+      "rmse": 0.0007081310857394798,
+      "n_eval": 195599
+    },
+    "coolant_temperature": {
+      "mae": 3.8701646633068645,
+      "rmse": 5.315747691923286,
+      "n_eval": 195599
+    },
+    "vibration_rms_x": {
+      "mae": 194.81514006304369,
+      "rmse": 281.0614418522578,
+      "n_eval": 187439
+    },
+    "vibration_order_1x": {
+      "mae": 18.321769289230584,
+      "rmse": 112.21592590547304,
+      "n_eval": 187439
+    },
+    "vibration_rms_x_bearing_proxy": {
+      "mae": 3.469446951953614e-17,
+      "rmse": 3.469446951953614e-17,
+      "n_eval": 195180
+    },
+    "vibration_order_1x_bearing_proxy": {
+      "mae": 0.0,
+      "rmse": 0.0,
+      "n_eval": 195599
+    },
+    "battery_voltage": {
+      "mae": 0.11866186889203394,
+      "rmse": 0.1880071793451743,
+      "n_eval": 195599
+    },
+    "battery_current": {
+      "mae": 0.14509197929334391,
+      "rmse": 0.297476101839526,
+      "n_eval": 195599
+    },
+    "alternator_power": {
+      "mae": 0.002014267830094011,
+      "rmse": 0.006788695287337862,
+      "n_eval": 195599
+    }
+  }
+}

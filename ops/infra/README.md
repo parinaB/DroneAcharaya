@@ -32,7 +32,7 @@ done yet.
 | Database | Supabase, free Postgres tier | Plain Postgres, no TimescaleDB extension — `backend/app/db/models.py` has no hypertable calls anywhere. Use Supabase's **connection pooler** string (not the direct connection) for `DATABASE_URL` — free tier has a low direct-connection limit. |
 | Frontend | `frontend/` (Next.js), merged and real — hosting not yet confirmed | Vercel's free tier is the default fit for a Next.js app if not already decided elsewhere. |
 | Unreal client | External, not built yet (Step 11) | Would hit the backend's REST/WS API on Render, same as any other consumer. |
-| ML models | Not deployed as services | Artifact files under `ml/artifacts/`, loaded in-process by `backend/app/core/model_loader.py` (still `NotImplementedError` — no artifacts exist yet). Render's filesystem has no shared volume with a teammate's training machine — how artifacts actually get onto Render is unsolved, see "Still open." |
+| ML models | Not deployed as services | Artifact files under `ml/artifacts/`, loaded in-process by `backend/app/core/model_loader.py` — `lstm_rul` (v1), `xgboost_classifier` (v1), and `autoencoder` (v3, paired with `digital_twin` v3) all have real artifacts. Resolved (see below): the runtime-required files for each pinned version (~16MB total) are committed directly in git, so Render's build just pulls them via the normal GitHub checkout — no shared volume or object-storage fetch needed. |
 
 ## What's built vs. what's still a placeholder
 
@@ -42,8 +42,8 @@ done yet.
 | `backend/app/db/` — SQLAlchemy models + Alembic migrations | **Built**, migrated and tested against local SQLite. Untested against real Postgres/Supabase — no project exists yet (see below). |
 | `/replay`, `/inference`, `/advisory`, `/ingestion` real endpoints | **Built**, replacing the four one-line stub routers. |
 | `data/sample_runs/` (what the bridge actually replays) | **Empty.** No data anywhere yet — waiting on the team's real data; see that folder's README for the exact layout expected. |
-| `frontend/` ↔ backend wiring | **Not started.** The merged dashboard is 100% hardcoded/mocked data; `frontend/lib/api-client.ts` still only calls `/health`. This is the concrete next gap, not a backend one. |
-| Real ML model wiring (Phase 7) | **Not started**, waits on `ml/artifacts/` existing. |
+| `frontend/` ↔ backend wiring | **Started, not finished.** `frontend/app/dashboard/_components/LiveModelPanel.tsx` is genuinely wired to `/replay` + `/inference` and shows real model output; the rest of the dashboard is still hardcoded/mocked. Wiring the remaining panels is the concrete next gap. |
+| Real ML model wiring (Step 8) | **Done.** All three models (`lstm_rul`, `xgboost_classifier`, `autoencoder`) have real artifacts loaded by `model_loader.py` and wired into `/inference`'s `HealthScoreOut`. |
 
 ## Local dev — one mode now, no Docker
 
@@ -81,10 +81,16 @@ dialect-specific.
   var so nothing is blocked on it; wire the real pooler string in whenever
   it's created, and actually test the schema against real Postgres then
   (only verified against SQLite so far).
-- **`ml/artifacts/` on Render** — genuinely unsolved. Once real artifacts
-  exist, something has to get them onto Render's filesystem (commit small
-  ones, or fetch from object storage at build/start) — not decided yet.
-- **`frontend/` ↔ backend wiring** — the real near-term gap. The dashboard
-  component tree (`frontend/app/dashboard/_components/LiveDashboard.tsx`)
-  defines, de facto, the exact field shapes the backend needs to serve;
+- **`ml/artifacts/` on Render — resolved.** The runtime-required files for
+  each pinned model version (~16MB total, see `ml/artifacts/README.md`) are
+  committed to git directly via a per-file `.gitignore` allow-list; Render's
+  normal GitHub-checkout build picks them up with no extra step. If a future
+  model version is too large for this (a much bigger checkpoint, say),
+  revisit — object storage fetched at build/start would be the fallback,
+  not decided in detail since it hasn't been needed yet.
+- **`frontend/` ↔ backend wiring** — mostly still the near-term gap.
+  `LiveModelPanel.tsx` is wired for the live-model-output slice; the rest of
+  the dashboard component tree
+  (`frontend/app/dashboard/_components/LiveDashboard.tsx`) still defines,
+  de facto, field shapes the backend doesn't yet serve for every panel —
   that hasn't been written down as a formal contract yet.

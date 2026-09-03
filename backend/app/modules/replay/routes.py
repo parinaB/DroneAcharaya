@@ -66,7 +66,7 @@ async def replay_status(session_id: str) -> dict:
 @router.get("/{session_id}/latest", response_model=LatestFrameOut)
 async def latest_frame(session_id: str, db: Session = Depends(get_db)) -> TelemetryRow:
     row = db.execute(
-        select(TelemetryRow).where(TelemetryRow.session_id == session_id).order_by(TelemetryRow.id.desc())
+        select(TelemetryRow).where(TelemetryRow.session_id == session_id).order_by(TelemetryRow.id.desc()).limit(1)
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail=f"no telemetry written yet for session {session_id!r}")

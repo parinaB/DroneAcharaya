@@ -1,12 +1,27 @@
 # Autoencoder — unsupervised anomaly detection
 
-**Status: v1 and v3 both trained** — see the [v3](#v3-sih_data) section
-below for the latest version. `autoencoder_training.ipynb` currently holds
-the **v3** training notebook (run on Google Colab against `SIH_data`); it
-replaced the earlier v1 notebook, which produced
-`ml/artifacts/autoencoder/v1/` and is still recoverable from git history if
-needed. `train.py`/`predict.py` below are the real CLI entry points the
-notebook's `%%writefile` cells emit and then invoke — not a stub.
+**Status: v1 and v3 both trained; v3 is wired into `backend/`.** See the
+[v3](#v3-sih_data) section below for the latest version.
+`autoencoder_training.ipynb` currently holds the **v3** training notebook
+(run on Google Colab against `SIH_data`); it replaced the earlier v1
+notebook, which produced `ml/artifacts/autoencoder/v1/` and is still
+recoverable from git history if needed. `train.py`/`predict.py` below are
+the real CLI entry points the notebook's `%%writefile` cells emit and then
+invoke — not a stub.
+
+`ml/artifacts/digital_twin/v3/` (27 per-channel regressors, paired with
+`autoencoder/v3` per the "Digital twin" section below) now exists, so
+`backend/app/core/model_loader.py`'s `load_autoencoder_bundle()` loads both
+and `backend/app/modules/inference/service.py`'s
+`autoencoder_anomaly_score()` scores every telemetry frame's reconstruction
+error live — a third, additive anomaly signal alongside `lstm_rul`'s
+`fault_type`/`health_index` and `xgboost_classifier`'s `sensor_fault_*`
+fields, never merged with either. Row-level (per this README's "Row-level
+(flat)" note above), so no rolling window is needed, but a frame's
+`engine_state` being a gated transient (`STARTING`/`SHUTDOWN`/
+`THROTTLE_TRANSIENT`) or a NaN-prone channel (e.g. vibration outside its
+active states) yields `null`, same honest-gap convention as the other two
+models — see `backend/CLAUDE.md`'s inference section.
 
 Learns to reconstruct **nominal** engine behaviour. At inference, reconstruction
 error becomes an anomaly score; a sustained rise flags "something is wrong"

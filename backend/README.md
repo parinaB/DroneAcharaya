@@ -43,10 +43,10 @@ dropped.
 | [`app/db/`](app/db/) | SQLAlchemy models + the write path (doubles as the recorder). |
 | [`migrations/`](migrations/) | Alembic migrations. |
 | [`app/modules/replay/`](app/modules/replay/) | Session lifecycle wrapping the bridge. |
-| [`app/modules/inference/`](app/modules/inference/) | Health/fault/RUL — a ground-truth stand-in today, a real model later, same response shape. |
+| [`app/modules/inference/`](app/modules/inference/) | Health/fault/RUL/anomaly — real `lstm_rul` + `xgboost_classifier` + `autoencoder` model output once each model's own rolling window (or, for the row-level autoencoder, a scoreable frame) is available; a ground-truth stand-in covers every session before that, same response shape either way. |
 | [`app/modules/advisory/`](app/modules/advisory/) | Placeholder — no rule set exists yet. |
 | [`app/modules/ingestion/`](app/modules/ingestion/) | Bridge/session activity status. |
-| [`app/core/`](app/core/) | Settings, logging, model loading (`model_loader.py`, not implemented yet). |
+| [`app/core/`](app/core/) | Settings, logging, model loading (`model_loader.py` — loads `lstm_rul`, `xgboost_classifier`, `autoencoder`; `digital_twin` is consumed as a dependency of the autoencoder's residual features, not loaded standalone). |
 | [`tests/`](tests/) | Includes `test_fixture_data.py`, which activates automatically once real data lands in `../data/sample_runs/`. |
 
 ## Current data

@@ -5,12 +5,13 @@ its input schema and output artifact layout.
 
 | Model | Job | Status |
 | --- | --- | --- |
-| `autoencoder/` | Unsupervised anomaly score from nominal-only training | training in progress |
-| `xgboost_classifier/` | Multi-class fault type identification | not started |
-| `lstm_rul/` | Remaining-useful-life regression | training in progress |
+| [`autoencoder/`](autoencoder/README.md) | Unsupervised anomaly score from nominal-only training | trained (v3) and wired into `backend/` |
+| [`xgboost_classifier/`](xgboost_classifier/README.md) | Per-channel sensor-fault classification (not multi-class fault type — see that README) | trained (v1) and wired into `backend/` |
+| [`lstm_rul/`](lstm_rul/README.md) | Multi-head health/RUL/sensor-fault regression | trained (v1) and wired into `backend/` (health+RUL heads only — see that README for why its own sensor-fault head is excluded) |
 
 All three read from `data/processed/` and write versioned artifacts into
-`ml/artifacts/` (gitignored). All three take `--data-path` and `--output-path`;
+`ml/artifacts/` (gitignored by default; runtime files for the pinned versions
+are committed — see `ml/artifacts/README.md`). All three take `--data-path` and `--output-path`;
 the two neural models also take `--epochs`.
 
 ## What the preprocessing notebook outputs

@@ -14,7 +14,7 @@ working in `ml/`.
 | [`features/`](features/) | `feature_engineering.py` — the **single** feature builder all three models share. |
 | [`notebooks/`](notebooks/) | Exploratory notebooks only — see the notebooks rule below. |
 | [`evaluation/`](evaluation/) | Held-out validation protocol, metrics, comparison reports. |
-| [`artifacts/`](artifacts/) | Versioned trained-model outputs — **gitignored**, distribute out of band. |
+| [`artifacts/`](artifacts/) | Versioned trained-model outputs — gitignored by default; the runtime files for each version pinned in `backend/app/core/config.py` are committed directly (see `artifacts/README.md`), everything else (eval exports, scratch checkpoints, non-pinned versions) is distributed out of band. |
 
 ## Non-negotiables
 
@@ -49,10 +49,14 @@ working in `ml/`.
   parameter names in `../contract/health-parameter-registry.md`. Model
   predictions write to their own suffixed columns (`fault_type_pred`,
   `rul_pred`) — never overwrite ground truth.
-- **Artifacts are versioned and never committed.** Each `ml/artifacts/<model>/<version>/`
-  needs a `metadata.json` (feature order, hyperparameters, metrics, dataset
-  id) alongside the weights — an artifact without it isn't reproducible and
-  shouldn't be shared.
+- **Artifacts are versioned, and only the runtime files for a version
+  actually pinned in `backend/app/core/config.py` get committed** (see
+  `artifacts/README.md`'s per-file `.gitignore` allow-list) — an
+  experimental or superseded version stays out of git, distributed out of
+  band instead. Each `ml/artifacts/<model>/<version>/` needs a
+  `metadata.json` (feature order, hyperparameters, metrics, dataset id)
+  alongside the weights either way — an artifact without it isn't
+  reproducible and shouldn't be shared.
 - **`physics_residuals()` is data-driven, not a re-run of `engine_core.slx`.**
   Step 7's "expected reference" is one regressor per target channel, fit on
   operating condition (rpm/throttle/altitude/ambient_temperature/air_density)

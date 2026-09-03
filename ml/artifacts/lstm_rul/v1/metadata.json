@@ -1,0 +1,59 @@
+{
+  "model": "lstm_rul",
+  "version": "v1",
+  "trained_in": "ml/training/lstm_rul/lstm_training.ipynb",
+  "dataset": "data/raw/main_batch_1000 (batch 3 -- see ml/training/lstm_rul/README.md for consolidation history)",
+  "architecture": {
+    "class": "EngineMultiHeadLSTM",
+    "input_size": 49,
+    "hidden_size": 256,
+    "num_layers": 3,
+    "dropout": 0.5,
+    "bidirectional": false,
+    "num_health_params": 16,
+    "num_sensor_channels": 2,
+    "num_sensor_fault_classes": 6
+  },
+  "features": {
+    "feature_order": "SENSOR_COLUMNS + MISSING_FLAG_COLUMNS + engine_state_col_names -- see ml/training/lstm_rul/README.md",
+    "seq_len": 60,
+    "stride": 10,
+    "forecast_horizon": 60,
+    "rul_scale_seconds": 3600.0
+  },
+  "training": {
+    "optimizer": "Adam",
+    "lr": 0.0005,
+    "weight_decay": 0.0001,
+    "lr_scheduler": "ReduceLROnPlateau(mode='min', factor=0.5, patience=5)",
+    "batch_size": 64,
+    "sampler": "WeightedRandomSampler (max of both sensor-fault channels' inverse-frequency class weight, per window)",
+    "loss_weights": { "alpha": 1.0, "beta": 1.0, "gamma": 0.1 },
+    "num_epochs_max": 60,
+    "num_epochs_run": 21,
+    "early_stopping_patience": 10,
+    "checkpoint_selection_metric": "val_health_loss + val_rul_loss"
+  },
+  "metrics": {
+    "best_checkpoint_score": 0.0699,
+    "val_health_loss": 0.0096,
+    "val_rul_loss": 0.0630,
+    "val_sensor_fault_loss": 0.8777,
+    "sensor_fault_active_cht_c3": {
+      "accuracy": 0.41,
+      "macro_f1": 0.35,
+      "any_fault_precision": 0.164,
+      "any_fault_recall": 0.982
+    },
+    "sensor_fault_active_vibration_rms_x_bearing_proxy": {
+      "accuracy": 0.88,
+      "macro_f1": 0.47,
+      "any_fault_precision": 0.004,
+      "any_fault_recall": 0.673
+    }
+  },
+  "known_issues": [
+    "WeightedRandomSampler oversampling caused severe precision collapse on sensor-fault heads (see README 'Known limitations') -- not recommended as the production checkpoint without revisiting the sampling strategy.",
+    "vibration_rms_x_bearing_proxy DROPOUT class still has very few positive examples relative to NONE despite the batch-3 increase."
+  ]
+}

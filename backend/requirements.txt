@@ -5,17 +5,23 @@ pydantic
 pydantic-settings
 numpy
 pandas
-scikit-learn
+# Pinned to the version ml/artifacts/lstm_rul/v1's scaler.joblib/
+# engine_state_encoder.joblib were pickled with (see model_loader.py) --
+# a version drift here is a silent-wrong-predictions risk, not just a
+# deprecation warning, since sklearn's pickle format isn't guaranteed
+# stable across versions.
+scikit-learn==1.6.1
 xgboost
-
-# CPU-only build: this is a serving API, not a training environment (see
-# ml/CLAUDE.md's Commands section for GPU training). Unpinned `torch` pulls
-# PyPI's default CUDA-bundled wheel plus its full nvidia-*/cuda-toolkit
-# dependency chain (several GB), which has been enough to exhaust CI runner
-# disk space outright. The CPU wheel is ~200MB and installs cleanly.
+# CPU-only build -- the backend only ever runs inference (forward passes on
+# tiny per-frame/per-window inputs, never training), so the default PyPI
+# wheel's bundled CUDA/cuDNN/NCCL/triton libraries (multi-GB) are pure
+# waste here, and were large enough to exhaust CI runners' disk space
+# during `pip install`. --extra-index-url below points pip at PyTorch's own
+# CPU wheel index (see https://pytorch.org/get-started/locally/) instead of
+# the default PyPI package, which ships full CUDA support.
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.14.0+cpu
-
+torch
+joblib
 shap
 python-multipart
 

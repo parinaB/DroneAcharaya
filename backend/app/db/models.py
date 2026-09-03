@@ -147,6 +147,21 @@ class HealthScore(Base):
     rul_upper: Mapped[float | None] = mapped_column(Float, nullable=True)
     source: Mapped[str] = mapped_column(String)  # "ground_truth" | "model"
     model_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    # 0.0 for ground_truth (describes t itself); lstm_rul forecasts t+60s --
+    # see HealthScoreOut's own docstring for why this isn't a repurposed field.
+    forecast_horizon_s: Mapped[float] = mapped_column(Float, default=0.0)
+    # xgboost_classifier's per-channel sensor-fault classification -- see
+    # HealthScoreOut's own docstring for why this is a separate field from
+    # fault_type, not merged into it.
+    sensor_fault_cht_c3: Mapped[str | None] = mapped_column(String, nullable=True)
+    sensor_fault_bearing_vibration: Mapped[str | None] = mapped_column(String, nullable=True)
+    sensor_fault_model_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    # autoencoder's reconstruction-error anomaly signal -- a third, additive
+    # vocabulary independent of fault_type/sensor_fault_* above, see
+    # HealthScoreOut's own docstring.
+    anomaly_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    is_anomalous: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    anomaly_model_version: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class AdvisoryState(Base):

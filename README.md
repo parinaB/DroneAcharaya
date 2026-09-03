@@ -22,13 +22,14 @@ what it is, how long they have, and what to do about it.
 
 | Folder | Purpose |
 | --- | --- |
-| [`contract/`](contract/) | The frozen-in-progress contract every other folder builds against — [telemetry schema](contract/telemetry-schema.yaml), [environment schema](contract/environment-schema.yaml), [parameter source table](contract/parameter-source-table.csv), [failure-mode matrix](contract/failure-mode-matrix.csv), and the [health-parameter registry](contract/health-parameter-registry.md) that keeps the last two in sync. Drafts — see [`contract/README.md`](contract/README.md). |
-| [`backend/`](backend/) | FastAPI service — real [bridge](backend/app/bridge/)/DB-backed [replay](backend/app/modules/replay/), ground-truth-stand-in [inference](backend/app/modules/inference/), placeholder [advisory](backend/app/modules/advisory/). Python 3.11, SQLAlchemy + Alembic, deploys to Render + Supabase (no Docker). |
-| [`frontend/`](frontend/) | Next.js 15 dashboard (App Router, TypeScript, Tailwind) — merged, real UI ([live dashboard](frontend/app/dashboard/)), currently hardcoded/mocked data, not yet wired to the backend. |
-| [`simulation/`](simulation/) | MATLAB/Simulink engine model, run scripts, [calibration](simulation/calibration/) references, and [fault injection](simulation/fault_injection/) definitions. Structure and docs only so far. |
-| [`ml/`](ml/) | [Training](ml/training/) for the three models, shared [feature engineering](ml/features/), [evaluation](ml/evaluation/) protocol, and versioned [artifacts](ml/artifacts/). |
-| [`data/`](data/) | Telemetry [schema](data/schema.md) (the source of truth for column names), immutable [raw](data/raw/) runs, model-ready [processed](data/processed/) datasets, and committed [sample runs](data/sample_runs/). |
-| [`docs/`](docs/) | [PS mapping](docs/ps_mapping.md), [architecture](docs/architecture.md), [methodology](docs/methodology.md), [deployment roadmap](docs/deployment_roadmap.md), and [pitch](docs/pitch/) material. |
+| [`contract/`](contract/README.md) | The frozen-in-progress contract every other folder builds against — [telemetry schema](contract/telemetry-schema.yaml), [environment schema](contract/environment-schema.yaml), [parameter source table](contract/parameter-source-table.csv), [failure-mode matrix](contract/failure-mode-matrix.csv), and the [health-parameter registry](contract/health-parameter-registry.md) that keeps the last two in sync. Drafts — see [`contract/README.md`](contract/README.md). |
+| [`backend/`](backend/README.md) | FastAPI service — real [bridge](backend/app/bridge/)/DB-backed [replay](backend/app/modules/replay/), [inference](backend/app/modules/inference/) (real `lstm_rul` + `xgboost_classifier` + `autoencoder` model output, ground-truth stand-in before each model's window fills), placeholder [advisory](backend/app/modules/advisory/). Python 3.11, SQLAlchemy + Alembic, deploys to Render + Supabase (no Docker). See [`backend/README.md`](backend/README.md) and [`backend/CLAUDE.md`](backend/CLAUDE.md) for the architecture. |
+| [`frontend/`](frontend/README.md) | Next.js 15 dashboard (App Router, TypeScript, Tailwind) — merged, real UI ([live dashboard](frontend/app/dashboard/), shared [components](frontend/components/README.md)), currently hardcoded/mocked data except the [live model panel](frontend/app/dashboard/_components/LiveModelPanel.tsx), which is wired to the backend's real replay/inference endpoints. |
+| [`simulation/`](simulation/README.md) | MATLAB/Simulink engine model ([`model/`](simulation/model/README.md)) and run/export scripts ([`scripts/`](simulation/scripts/README.md)) — built and validated. `calibration/` and `fault_injection/` are superseded stubs (see [`simulation/CLAUDE.md`](simulation/CLAUDE.md) for where that logic actually lives now). |
+| [`ml/`](ml/CLAUDE.md) | [Training](ml/training/README.md) for the three models ([autoencoder](ml/training/autoencoder/README.md), [xgboost_classifier](ml/training/xgboost_classifier/README.md), [lstm_rul](ml/training/lstm_rul/README.md)), shared [feature engineering](ml/features/README.md), [evaluation](ml/evaluation/README.md) protocol, and versioned [artifacts](ml/artifacts/README.md) (gitignored by default, except the ~16MB of runtime files for the versions actually pinned in `backend/app/core/config.py`, which are committed). |
+| [`data/`](data/README.md) | Telemetry [schema](data/schema.md) (the source of truth for column names — see [`data/README.md`](data/README.md) for the full data-folder reference), immutable [raw](data/raw/README.md) runs, model-ready [processed](data/processed/README.md) datasets, and [sample runs](data/sample_runs/README.md) (tracked fixture slot, currently empty). |
+| [`docs/`](docs/build_plan.md) | The full [build plan](docs/build_plan.md) (five layers, Step 0–12 order — read this before proposing architecture), [PS mapping](docs/ps_mapping.md), [architecture](docs/architecture.md), [methodology](docs/methodology.md), [deployment roadmap](docs/deployment_roadmap.md), and [pitch](docs/pitch/README.md) material. |
+| [`ops/infra/`](ops/infra/README.md) | Deployment target and reasoning — Render + Supabase, no Docker/TimescaleDB/Grafana. |
 
 ## Getting started
 
@@ -86,25 +87,55 @@ cd frontend && npm run lint && npm run typecheck && npm run build
 
 `simulation/` (the physics layer: environment service, engine core,
 crank-resolved sidecar, and the full dataset-generation pipeline) is built
-and validated — see `docs/build_plan.md`'s Step 6 log and
-`data/processed/main_batch_1000/` (123 units, 1111 missions,
+and validated — see [`docs/build_plan.md`](docs/build_plan.md)'s Step 6 log
+and `data/processed/main_batch_1000/` (123 units, 1111 missions,
 `verify_batch.m`-clean) for the real training dataset. Step 7's digital twin
 has a first working slice (`ml/features/fit_digital_twin.py` +
 `physics_residuals()` — data-driven expected-value models, verified to
-discriminate a real fault; see `docs/build_plan.md`'s Step 7 log). **Step 8
-(ML training) is underway**: autoencoder and LSTM training are actively in
-progress via `ml/notebooks/` and their per-model training notebooks; the
-XGBoost classifier hasn't started yet. **`backend/` now has a real Step 9
-vertical slice**: a bridge (`app/bridge/`) that replays a run and writes
-telemetry + a ground-truth-stand-in health score through SQLAlchemy/Alembic
-(plain Postgres — no TimescaleDB) into real `/replay`, `/inference`,
-`/advisory` endpoints — see `ops/infra/README.md` for the deployment target
+discriminate a real fault; see `docs/build_plan.md`'s Step 7 log).
+
+**Step 8 (ML training) — all three models are trained and wired into the
+backend**: `autoencoder` (v3, paired with `ml/artifacts/digital_twin/v3/`'s
+27 per-channel regressors — see
+[`ml/training/autoencoder/README.md`](ml/training/autoencoder/README.md)),
+`xgboost_classifier` (v1, two per-channel sensor-fault classifiers — see
+[`ml/training/xgboost_classifier/README.md`](ml/training/xgboost_classifier/README.md)),
+and `lstm_rul` (v1, multi-head health/RUL — see
+[`ml/training/lstm_rul/README.md`](ml/training/lstm_rul/README.md)) all have
+real artifacts loaded by
+[`backend/app/core/model_loader.py`](backend/app/core/model_loader.py).
+
+**`backend/` has a real Step 9 vertical slice, now serving real model
+output, not just ground truth**: a bridge (`app/bridge/`) replays a run and
+writes telemetry + a health score through SQLAlchemy/Alembic (plain
+Postgres — no TimescaleDB) into real `/replay`, `/inference`, `/advisory`
+endpoints. `/inference`'s `HealthScoreOut` returns `lstm_rul`'s
+health/fault/RUL once a session's 60-frame rolling window fills,
+`xgboost_classifier`'s per-channel sensor-fault classification once a
+shorter 10-frame window fills, and the `autoencoder`'s row-level anomaly
+score on every scoreable frame (gated to `null` on
+`STARTING`/`SHUTDOWN`/`THROTTLE_TRANSIENT` transients) — a
+ground-truth stand-in covers any session before those windows fill. See
+[`ops/infra/README.md`](ops/infra/README.md) for the deployment target
 (Render + Supabase, no Docker, no Grafana) and why those calls were made.
-It's idle right now, though: `data/sample_runs/` is empty, waiting on the
-team's real data. **`frontend/` is merged and real** (`app/dashboard/`), but
-still 100% hardcoded/mocked — not yet wired to the backend's new endpoints;
-that wiring is the next concrete gap. `docs/architecture.md`,
-`docs/methodology.md` and `docs/deployment_roadmap.md` are heading
-skeletons. `data/README.md`, `ml/evaluation/README.md`, and the
-`simulation/` READMEs carry the real decisions and are the place to start
-reading.
+The real, tracked `data/sample_runs/` is still empty, though — waiting on
+the team's real data (see
+[`data/sample_runs/README.md`](data/sample_runs/README.md)) — so this slice
+is currently exercised only against synthetic/local fixtures, not committed
+ones.
+
+**`frontend/` is merged and mostly still hardcoded/mocked**
+(`app/dashboard/`), except its
+[`LiveModelPanel`](frontend/app/dashboard/_components/LiveModelPanel.tsx),
+which is genuinely wired to the backend's `/replay` + `/inference`
+endpoints and displays real `lstm_rul`/`xgboost_classifier`/`autoencoder`
+output once a session starts. Wiring the rest of the dashboard's mocked
+panels to the backend is the next concrete gap.
+
+`docs/architecture.md`, `docs/methodology.md` and
+`docs/deployment_roadmap.md` are heading skeletons.
+[`data/README.md`](data/README.md), [`ml/evaluation/README.md`](ml/evaluation/README.md),
+and the `simulation/` READMEs ([`simulation/README.md`](simulation/README.md),
+[`simulation/model/README.md`](simulation/model/README.md),
+[`simulation/scripts/README.md`](simulation/scripts/README.md)) carry the
+real decisions and are the place to start reading.

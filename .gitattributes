@@ -1,0 +1,12 @@
+# The three large training notebooks are 80-93% embedded cell output
+# (Colab execution logs, printed metrics, base64 plot images) by byte count,
+# not hand-written code -- that was skewing GitHub's language bar toward
+# "Jupyter Notebook" far out of proportion to actual authored code.
+# linguist-generated excludes them from language stats and the diff view by
+# default (doesn't affect git tracking/diffing on the command line).
+# ml/notebooks/DroneAcharaya_Preprocessing.ipynb is NOT listed here --
+# unlike the three below, it's already mostly source (~67% code by bytes),
+# so it's left counted normally.
+ml/training/lstm_rul/lstm_training.ipynb linguist-generated=true
+ml/training/xgboost_classifier/xgboost_training.ipynb linguist-generated=true
+ml/training/autoencoder/autoencoder_training.ipynb linguist-generated=true
