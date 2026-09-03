@@ -7,26 +7,24 @@ import { LiveDashboard } from "./_components/LiveDashboard";
 import { LiveModelPanel } from "./_components/LiveModelPanel";
 import { SimulationView } from "./_components/SimulationView";
 import { LoadingScreen } from "./_components/LoadingScreen";
-import { hms } from "./_lib/format";
 import { color } from "./_lib/tokens";
 import {
   DEFAULT_SIM_PARAMS,
   SIM_RUN_LENGTH,
+  THEME_STORAGE_KEY,
   type Camera,
-  type Role,
   type Screen,
   type SimParams,
+  type Theme,
   type XaiTab,
 } from "./_lib/state";
 
-/** Mission elapsed time is a fixed demo value; the design mock doesn't tick it. */
-const MISSION_ELAPSED_SECONDS = 6146;
-
 export default function DashboardPage() {
   const [booting, setBooting] = useState(true);
+  const [theme, setTheme] = useState<Theme>("dark");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const [screen, setScreen] = useState<Screen>("dashboard");
-  const [role, setRole] = useState<Role>("operator");
   const [acknowledged, setAcknowledged] = useState(false);
 
   const [playing, setPlaying] = useState(true);
@@ -36,7 +34,7 @@ export default function DashboardPage() {
   const [camera, setCamera] = useState<Camera>("eng");
   const [xai, setXai] = useState<XaiTab>("drivers");
   const [fullscreen, setFullscreen] = useState(false);
-  const [params, setParams] = useState<SimParams>(DEFAULT_SIM_PARAMS);
+  const [params] = useState<SimParams>(DEFAULT_SIM_PARAMS);
 
   useEffect(() => {
     if (!playing) return;
@@ -45,6 +43,27 @@ export default function DashboardPage() {
     }, 1000);
     return () => clearInterval(id);
   }, [playing, speed]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(THEME_STORAGE_KEY);
+      if (stored === "light" || stored === "dark") setTheme(stored);
+    } catch {
+      // localStorage unavailable (private mode, etc.) -- default theme stands.
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    setTheme((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      try {
+        localStorage.setItem(THEME_STORAGE_KEY, next);
+      } catch {
+        // best-effort persistence only
+      }
+      return next;
+    });
+  };
 
   const openPrediction = () => {
     setScreen("simulation");
@@ -68,6 +87,7 @@ export default function DashboardPage() {
       />
       <div
         className="dt-root"
+        data-theme={theme}
         style={{
           display: "flex",
           height: "100vh",
@@ -83,13 +103,18 @@ export default function DashboardPage() {
           transition: "opacity 500ms ease",
         }}
       >
-        <Sidebar screen={screen} onScreenChange={setScreen} />
+        <Sidebar
+          screen={screen}
+          onScreenChange={setScreen}
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={() => setSidebarCollapsed((c) => !c)}
+        />
 
         <main style={{ flex: "1 1 auto", display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
-          <TopBar screen={screen} role={role} onRoleChange={setRole} missionClock={hms(MISSION_ELAPSED_SECONDS)} />
+          <TopBar screen={screen} theme={theme} onToggleTheme={toggleTheme} />
 
           <div key={screen} className="dt-screen-enter" style={{ flex: "1 1 auto", display: "flex", minHeight: 0 }}>
-            {screen === "dashboard" ? (
+            {booting ? null : screen === "dashboard" ? (
               <div style={{ flex: "1 1 auto", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, overflow: "hidden" }}>
                 <LiveModelPanel />
                 <LiveDashboard
@@ -104,8 +129,6 @@ export default function DashboardPage() {
                 scenario={scenario}
                 onScenarioChange={setScenario}
                 params={params}
-                onParamsChange={setParams}
-                onResetParams={() => setParams(DEFAULT_SIM_PARAMS)}
                 playing={playing}
                 onTogglePlay={() => setPlaying((p) => !p)}
                 speed={speed}

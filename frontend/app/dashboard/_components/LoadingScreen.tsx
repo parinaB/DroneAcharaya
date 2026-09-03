@@ -1,10 +1,24 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { color, font } from "../_lib/tokens";
+import { font } from "../_lib/tokens";
 
 const FILL_MS = 2200;
 const HOLD_MS = 350;
+
+/** Always-dark literal colors, not the theme tokens: this screen renders
+ * outside `.dt-root` (it boots before the theme choice is even known), so
+ * the `color.*` CSS-variable tokens have nothing to resolve against here. */
+const boot = {
+  bg: "#000000",
+  text: "#e8ebed",
+  textLabel: "#6f7981",
+  textLabel2: "#626c74",
+  accent: "#39ff14",
+  accentDim: "#1f8a35",
+  track: "#1c2125",
+  mark: "#1d2427",
+} as const;
 
 /** Full-screen boot sequence shown on every mount; fills a progress bar to
  * 100% then calls onDone so the dashboard beneath can fade in. */
@@ -50,7 +64,8 @@ export function LoadingScreen({ onDone }: { onDone: () => void }) {
         alignItems: "center",
         justifyContent: "center",
         gap: 26,
-        background: color.bg,
+        background: boot.bg,
+        color: boot.text,
         fontFamily: font.sans,
       }}
     >
@@ -61,7 +76,7 @@ export function LoadingScreen({ onDone }: { onDone: () => void }) {
             width: 52,
             height: 52,
             borderRadius: 14,
-            background: "#1d2427",
+            background: boot.mark,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -72,7 +87,7 @@ export function LoadingScreen({ onDone }: { onDone: () => void }) {
             style={{
               width: 20,
               height: 20,
-              border: `3px solid ${color.accent}`,
+              border: `3px solid ${boot.accent}`,
               borderRadius: "50%",
               borderRightColor: "transparent",
             }}
@@ -80,12 +95,12 @@ export function LoadingScreen({ onDone }: { onDone: () => void }) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "0.12em" }}>DRONACHARYA</div>
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "0.12em" }}>DRONE-ACHARYA</div>
           <div
             style={{
               fontFamily: font.mono,
               fontSize: 11,
-              color: color.textLabel2,
+              color: boot.textLabel2,
               letterSpacing: "0.16em",
             }}
           >
@@ -100,7 +115,7 @@ export function LoadingScreen({ onDone }: { onDone: () => void }) {
             width: "100%",
             height: 4,
             borderRadius: 999,
-            background: "#1c2125",
+            background: boot.track,
             overflow: "hidden",
           }}
         >
@@ -109,7 +124,7 @@ export function LoadingScreen({ onDone }: { onDone: () => void }) {
               width: `${progress}%`,
               height: "100%",
               borderRadius: 999,
-              background: `linear-gradient(90deg, ${color.accentDim}, ${color.accent})`,
+              background: `linear-gradient(90deg, ${boot.accentDim}, ${boot.accent})`,
               transition: "width 80ms linear",
             }}
           />
@@ -118,7 +133,7 @@ export function LoadingScreen({ onDone }: { onDone: () => void }) {
           style={{
             fontFamily: font.mono,
             fontSize: 11,
-            color: color.textLabel,
+            color: boot.textLabel,
             letterSpacing: "0.08em",
           }}
         >

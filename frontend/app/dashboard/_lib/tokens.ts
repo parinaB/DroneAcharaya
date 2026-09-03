@@ -1,28 +1,32 @@
-/** Design tokens shared across the dashboard, kept in one place so the
- * dark palette from the design handoff stays consistent across screens. */
+/** Design tokens shared across the dashboard. Values are CSS custom
+ * properties (defined for both themes in globals.css, scoped under
+ * `.dt-root`) so every component that reads `color.*` repaints for free
+ * when the theme toggle flips `data-theme` on the root element. */
 export const color = {
-  bg: "#0b0d0f",
-  panelBg: "#0e1113",
-  panelBgAlt: "#0f1114",
-  border: "#1c2125",
-  borderSoft: "#1a1f23",
-  text: "#e8ebed",
-  textDim: "#b8c0c6",
-  textMuted: "#97a1a8",
-  textFaint: "#7d878e",
-  textLabel: "#6f7981",
-  textLabel2: "#626c74",
-  textLabel3: "#5e686f",
-  accent: "#4fb391",
-  accentHover: "#7fcbb0",
-  accentDim: "#2f6f5e",
-  danger: "#ff4d3d",
-  dangerHover: "#ff6a5c",
-  dangerSoft: "#ff7a6d",
-  tabOnBg: "#1d2427",
-  tabOnRing: "inset 0 0 0 1px #2b3238",
-  tabOffBg: "#12161a",
-  tabOffRing: "inset 0 0 0 1px #1c2125",
+  bg: "var(--dt-bg)",
+  panelBg: "var(--dt-panel-bg)",
+  panelBgAlt: "var(--dt-panel-bg-alt)",
+  border: "var(--dt-border)",
+  borderSoft: "var(--dt-border-soft)",
+  text: "var(--dt-text)",
+  textDim: "var(--dt-text-dim)",
+  textMuted: "var(--dt-text-muted)",
+  textFaint: "var(--dt-text-faint)",
+  textLabel: "var(--dt-text-label)",
+  textLabel2: "var(--dt-text-label-2)",
+  textLabel3: "var(--dt-text-label-3)",
+  textInactive: "var(--dt-text-inactive)",
+  accent: "var(--dt-accent)",
+  accentHover: "var(--dt-accent-hover)",
+  accentDim: "var(--dt-accent-dim)",
+  danger: "var(--dt-danger)",
+  dangerHover: "var(--dt-danger-hover)",
+  dangerSoft: "var(--dt-danger-soft)",
+  tabOnBg: "var(--dt-tab-on-bg)",
+  tabOnRing: "inset 0 0 0 1px var(--dt-tab-on-ring)",
+  tabOffBg: "var(--dt-tab-off-bg)",
+  tabOffRing: "inset 0 0 0 1px var(--dt-tab-off-ring)",
+  wellBg: "var(--dt-well-bg)",
 } as const;
 
 export const font = {
@@ -39,11 +43,22 @@ export interface TabStyle {
 export function tabStyle(active: boolean): TabStyle {
   return active
     ? { bg: color.tabOnBg, fg: color.text, ring: color.tabOnRing }
-    : { bg: "transparent", fg: "#8d979f", ring: "none" };
+    : { bg: "transparent", fg: color.textInactive, ring: "none" };
 }
 
 export function cardTabStyle(active: boolean): TabStyle {
   return active
     ? { bg: color.tabOnBg, fg: color.text, ring: color.tabOnRing }
     : { bg: color.tabOffBg, fg: color.textDim, ring: color.tabOffRing };
+}
+
+/** Overrides a `.dt-glow-card`'s hover glow from the default accent green to
+ * danger red when the card is reporting a critical reading -- derived from
+ * the same `--dt-danger` token so it stays correct across both themes. */
+export function glowVars(critical: boolean): Record<string, string> {
+  if (!critical) return {};
+  return {
+    "--dt-glow": `color-mix(in srgb, ${color.danger} 55%, transparent)`,
+    "--dt-glow-shadow": `color-mix(in srgb, ${color.danger} 18%, transparent)`,
+  };
 }
