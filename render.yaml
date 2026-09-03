@@ -1,0 +1,28 @@
+# Render Blueprint — see https://render.com/docs/blueprint-spec
+#
+# Deploys backend/ as a native Python web service (no Docker, per
+# ops/infra/README.md's decision). DATABASE_URL is deliberately left
+# `sync: false` — Render will prompt for it in the dashboard rather than
+# storing a real connection string in this file. See
+# ops/infra/RENDER_DEPLOY.md for the full step-by-step runbook.
+
+services:
+  - type: web
+    name: droneacharaya-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        sync: false # set manually in the Render dashboard -- Supabase's pooler string, never committed
+      - key: ARTIFACTS_DIR
+        value: ../ml/artifacts
+      - key: DATA_DIR
+        value: ../data
+      - key: LOG_LEVEL
+        value: INFO
+    healthCheckPath: /health

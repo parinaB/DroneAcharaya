@@ -24,13 +24,16 @@ done yet.
 **`ops/grafana/` is dead** — delete it by hand if it's still present
 (untracked, safe to remove).
 
-## Actual deployment target
+## Actual deployment target — **live**
+
+Step-by-step runbook: [`RENDER_DEPLOY.md`](RENDER_DEPLOY.md). Blueprint:
+[`render.yaml`](../../render.yaml) (repo root).
 
 | Piece | Where | Notes |
 | --- | --- | --- |
-| Backend (FastAPI + bridge) | Render, free web service, deployed from GitHub, **native Python runtime — no Dockerfile** | Render injects its own `$PORT`; start command is `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. |
-| Database | Supabase, free Postgres tier | Plain Postgres, no TimescaleDB extension — `backend/app/db/models.py` has no hypertable calls anywhere. Use Supabase's **connection pooler** string (not the direct connection) for `DATABASE_URL` — free tier has a low direct-connection limit. |
-| Frontend | `frontend/` (Next.js), merged and real — hosting not yet confirmed | Vercel's free tier is the default fit for a Next.js app if not already decided elsewhere. |
+| Backend (FastAPI + bridge) | **Live** — https://droneacharaya.onrender.com — Render free web service from GitHub, **native Python runtime, no Dockerfile** | Render injects its own `$PORT`; start command is `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, root directory `backend`, build command runs `alembic upgrade head` (which is what created the Supabase tables). |
+| Database | **Live** — Supabase free Postgres tier | Plain Postgres, no TimescaleDB extension. **Must use the Session pooler string, not "Direct connection"** — Supabase's direct host resolves to IPv6-only, and Render has no IPv6 egress, so a direct string fails with `Network is unreachable`. All migrations have now run successfully against real Postgres. |
+| Frontend | **Live** — https://drone-acharaya.vercel.app — Vercel free tier | Root directory must be set to `frontend`. Needs `NEXT_PUBLIC_API_BASE_URL=https://droneacharaya.onrender.com`, and its origin must be in `backend/app/core/config.py`'s `cors_origins` or the browser blocks every call. |
 | Unreal client | External, not built yet (Step 11) | Would hit the backend's REST/WS API on Render, same as any other consumer. |
 | ML models | Not deployed as services | Artifact files under `ml/artifacts/`, loaded in-process by `backend/app/core/model_loader.py` — `lstm_rul` (v1), `xgboost_classifier` (v1), and `autoencoder` (v3, paired with `digital_twin` v3) all have real artifacts. Resolved (see below): the runtime-required files for each pinned version (~16MB total) are committed directly in git, so Render's build just pulls them via the normal GitHub checkout — no shared volume or object-storage fetch needed. |
 
@@ -39,7 +42,7 @@ done yet.
 | Piece | Status |
 | --- | --- |
 | `backend/app/bridge/` — `FrameSource`/`ReplaySource`/`BridgeService`, `can_framing.py` stub | **Built.** Verified end-to-end with a hand-made 5-frame smoke run (not committed) — telemetry + health-score rows land correctly, health index tracks a decaying fault. |
-| `backend/app/db/` — SQLAlchemy models + Alembic migrations | **Built**, migrated and tested against local SQLite. Untested against real Postgres/Supabase — no project exists yet (see below). |
+| `backend/app/db/` — SQLAlchemy models + Alembic migrations | **Built and deployed.** All migrations have run successfully against the real Supabase Postgres (not just local SQLite) as part of Render's build command. |
 | `/replay`, `/inference`, `/advisory`, `/ingestion` real endpoints | **Built**, replacing the four one-line stub routers. |
 | `data/sample_runs/` (what the bridge actually replays) | **Empty.** No data anywhere yet — waiting on the team's real data; see that folder's README for the exact layout expected. |
 | `frontend/` ↔ backend wiring | **Started, not finished.** `frontend/app/dashboard/_components/LiveModelPanel.tsx` is genuinely wired to `/replay` + `/inference` and shows real model output; the rest of the dashboard is still hardcoded/mocked. Wiring the remaining panels is the concrete next gap. |
@@ -74,13 +77,26 @@ dialect-specific.
 
 - **The diagram needs a full redraw** — current one shows a topology
   (Docker network, Timescale, Grafana) that no longer exists at all.
-- **Frontend hosting isn't confirmed** — assumed Vercel by default; confirm
-  before wiring CORS (`backend/app/core/config.py`'s `cors_origins`) to a
-  real deployed URL instead of just `localhost:3000`.
-- **Supabase project doesn't exist yet** — `DATABASE_URL` is a plain env
-  var so nothing is blocked on it; wire the real pooler string in whenever
-  it's created, and actually test the schema against real Postgres then
-  (only verified against SQLite so far).
+- **Frontend hosting — resolved.** Vercel, live at
+  https://drone-acharaya.vercel.app. Its origin is now in
+  `backend/app/core/config.py`'s `cors_origins`. Vercel also issues
+  per-branch preview URLs (`drone-acharaya-git-<branch>-<scope>.vercel.app`)
+  which are **not** in that list — add them if a preview ever needs to call
+  the API.
+- **Supabase — resolved.** Project exists, migrations applied, backend
+  connected. Two gotchas cost real time and are worth remembering: use the
+  **Session pooler** string (direct connection is IPv6-only and unreachable
+  from Render), and watch for a **trailing newline** when pasting the
+  connection string into Render's env-var field — Postgres reads it as part
+  of the database name and fails with a baffling
+  `database "postgres\n" does not exist`.
+- **Render free-tier cold start** — the service sleeps after ~15 min idle,
+  and the next request pays 30-60s (measured: timed out at 30s, succeeded at
+  ~60s). Mitigated by an external cron-job.org ping to `/health` every 10
+  minutes. Deliberately *not* a GitHub Actions scheduled workflow: at
+  1-minute minimum billing per run, every-10-minutes would burn ~4,320
+  Actions minutes/month against a 2,000-minute private-repo quota, starving
+  the real CI workflows.
 - **`ml/artifacts/` on Render — resolved.** The runtime-required files for
   each pinned model version (~16MB total, see `ml/artifacts/README.md`) are
   committed to git directly via a per-file `.gitignore` allow-list; Render's
