@@ -7,22 +7,17 @@ import { LiveDashboard } from "./_components/LiveDashboard";
 import { LiveModelPanel } from "./_components/LiveModelPanel";
 import { SimulationView } from "./_components/SimulationView";
 import { LoadingScreen } from "./_components/LoadingScreen";
-import { hms } from "./_lib/format";
 import { color } from "./_lib/tokens";
 import {
   DEFAULT_SIM_PARAMS,
   SIM_RUN_LENGTH,
   THEME_STORAGE_KEY,
   type Camera,
-  type Role,
   type Screen,
   type SimParams,
   type Theme,
   type XaiTab,
 } from "./_lib/state";
-
-/** Mission elapsed time is a fixed demo value; the design mock doesn't tick it. */
-const MISSION_ELAPSED_SECONDS = 6146;
 
 export default function DashboardPage() {
   const [booting, setBooting] = useState(true);
@@ -30,7 +25,6 @@ export default function DashboardPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const [screen, setScreen] = useState<Screen>("dashboard");
-  const [role, setRole] = useState<Role>("operator");
   const [acknowledged, setAcknowledged] = useState(false);
 
   const [playing, setPlaying] = useState(true);
@@ -117,14 +111,7 @@ export default function DashboardPage() {
         />
 
         <main style={{ flex: "1 1 auto", display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
-          <TopBar
-            screen={screen}
-            role={role}
-            onRoleChange={setRole}
-            missionClock={hms(MISSION_ELAPSED_SECONDS)}
-            theme={theme}
-            onToggleTheme={toggleTheme}
-          />
+          <TopBar screen={screen} theme={theme} onToggleTheme={toggleTheme} />
 
           <div key={screen} className="dt-screen-enter" style={{ flex: "1 1 auto", display: "flex", minHeight: 0 }}>
             {booting ? null : screen === "dashboard" ? (
