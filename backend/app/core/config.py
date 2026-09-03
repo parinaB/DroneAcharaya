@@ -19,8 +19,15 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     log_level: str = "INFO"
 
-    # Origins allowed to call this API (the Next.js dev server by default).
-    cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # Origins allowed to call this API: the Next.js dev server, plus the
+    # deployed Vercel frontend. Vercel also issues per-branch preview URLs
+    # (drone-acharaya-git-<branch>-<scope>.vercel.app) -- add those here too
+    # if a preview deployment ever needs to hit this API.
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://drone-acharaya.vercel.app",
+    ]
 
     # Filesystem roots. Defaults resolve relative to the repository root
     # (i.e. assume CWD is backend/, per `cd backend && uvicorn ...`).
