@@ -34,7 +34,7 @@ export default function DashboardPage() {
   const [camera, setCamera] = useState<Camera>("eng");
   const [xai, setXai] = useState<XaiTab>("drivers");
   const [fullscreen, setFullscreen] = useState(false);
-  const [params, setParams] = useState<SimParams>(DEFAULT_SIM_PARAMS);
+  const [params] = useState<SimParams>(DEFAULT_SIM_PARAMS);
 
   useEffect(() => {
     if (!playing) return;
@@ -129,8 +129,6 @@ export default function DashboardPage() {
                 scenario={scenario}
                 onScenarioChange={setScenario}
                 params={params}
-                onParamsChange={setParams}
-                onResetParams={() => setParams(DEFAULT_SIM_PARAMS)}
                 playing={playing}
                 onTogglePlay={() => setPlaying((p) => !p)}
                 speed={speed}
