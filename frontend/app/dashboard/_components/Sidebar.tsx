@@ -135,7 +135,7 @@ export function Sidebar({
         </div>
         {!collapsed && (
           <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
-            DRONACHARYA
+            DRONE-ACHARYA
           </div>
         )}
       </div>
