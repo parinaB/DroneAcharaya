@@ -2,6 +2,10 @@ export type Screen = "dashboard" | "simulation";
 export type Role = "operator" | "engineer" | "maintenance";
 export type Camera = "ext" | "eng" | "thermal";
 export type XaiTab = "drivers" | "residual" | "reasoning";
+export type Theme = "dark" | "light";
+
+/** localStorage key the theme toggle persists to. */
+export const THEME_STORAGE_KEY = "dt-theme";
 
 export interface SimParams {
   throttle: number;
