@@ -1,0 +1,11 @@
+Model Information:
+* title:	MQ-9 Reaper UAV Drone
+* source:	https://sketchfab.com/3d-models/mq-9-reaper-uav-drone-89e4291e8ab14ebd85ef68a0f3a25691
+* author:	Chenzoss (https://sketchfab.com/Chenzoss)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "MQ-9 Reaper UAV Drone" (https://sketchfab.com/3d-models/mq-9-reaper-uav-drone-89e4291e8ab14ebd85ef68a0f3a25691) by Chenzoss (https://sketchfab.com/Chenzoss) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

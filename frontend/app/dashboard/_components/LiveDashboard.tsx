@@ -249,10 +249,6 @@ function CriticalFaultSection({
           >
             <div style={{ display: "flex", alignItems: "center", gap: 9, flexShrink: 0 }}>
               <span
-                className={acknowledged || isHealthy ? undefined : "dt-pulse"}
-                style={{ width: 7, height: 7, borderRadius: "50%", background: isHealthy ? color.accent : acknowledged ? "#6b7a80" : color.danger }}
-              />
-              <span
                 style={{
                   fontFamily: font.mono,
                   fontSize: 11.5,
