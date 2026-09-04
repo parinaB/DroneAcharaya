@@ -14,22 +14,13 @@ import {
   rpmLabel,
 } from "../_lib/format";
 import { cardTabStyle, color, font, glowVars, tabStyle } from "../_lib/tokens";
-import { type Camera, type XaiTab } from "../_lib/state";
+import { type XaiTab } from "../_lib/state";
 import { PRESET_CATEGORIES, isRulDeclining, presetCategory, presetLabel, type PresetCategory, type ReplaySession } from "../_lib/useReplaySession";
 import type { RunSummary } from "../../../lib/types";
+import { EngineScene } from "../../../components/EngineScene/EngineScene";
 import { RulChart } from "./RulChart";
 
 const SPEEDS = [1, 2, 5, 10] as const;
-const CAMERAS: { key: Camera; label: string }[] = [
-  { key: "ext", label: "EXT" },
-  { key: "eng", label: "ENGINE BAY" },
-  { key: "thermal", label: "THERMAL" },
-];
-const CAMERA_VIEW_LABEL: Record<Camera, string> = {
-  ext: "EXTERIOR VIEW",
-  eng: "ENGINE BAY",
-  thermal: "THERMAL OVERLAY",
-};
 const XAI_TABS: { key: XaiTab; label: string }[] = [
   { key: "drivers", label: "Signals" },
   { key: "reasoning", label: "Summary" },
@@ -46,8 +37,6 @@ function isHealthCritical(healthIndex: number | null | undefined): boolean {
 
 export interface SimulationViewProps {
   session: ReplaySession;
-  camera: Camera;
-  onCameraChange: (camera: Camera) => void;
   xai: XaiTab;
   onXaiChange: (xai: XaiTab) => void;
   fullscreen: boolean;
@@ -56,7 +45,7 @@ export interface SimulationViewProps {
   onGoToAnalytics: () => void;
 }
 
-export function SimulationView({ session, camera, onCameraChange, xai, onXaiChange, fullscreen, onToggleFullscreen, onGoToAnalytics }: SimulationViewProps) {
+export function SimulationView({ session, xai, onXaiChange, fullscreen, onToggleFullscreen, onGoToAnalytics }: SimulationViewProps) {
   return (
     <div
       style={{
@@ -68,7 +57,7 @@ export function SimulationView({ session, camera, onCameraChange, xai, onXaiChan
       }}
     >
       <PresetPanel session={session} />
-      <Viewport session={session} camera={camera} onCameraChange={onCameraChange} fullscreen={fullscreen} onToggleFullscreen={onToggleFullscreen} onGoToAnalytics={onGoToAnalytics} />
+      <Viewport session={session} fullscreen={fullscreen} onToggleFullscreen={onToggleFullscreen} onGoToAnalytics={onGoToAnalytics} />
       <TelemetryPanel session={session} xai={xai} onXaiChange={onXaiChange} />
     </div>
   );
@@ -267,15 +256,11 @@ function SyncRow({ label, value }: { label: string; value: string }) {
 
 function Viewport({
   session,
-  camera,
-  onCameraChange,
   fullscreen,
   onToggleFullscreen,
   onGoToAnalytics,
 }: {
   session: ReplaySession;
-  camera: Camera;
-  onCameraChange: (camera: Camera) => void;
   fullscreen: boolean;
   onToggleFullscreen: () => void;
   onGoToAnalytics: () => void;
@@ -319,107 +304,11 @@ function Viewport({
           minHeight: 0,
         }}
       >
-        <svg width="100%" height="100%" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, display: "block" }}>
-          <defs>
-            <pattern id="dtStripe" width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-              <line x1="0" y1="0" x2="0" y2="14" stroke="#14181b" strokeWidth="7" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="#0d1013" />
-          <rect width="100%" height="100%" fill="url(#dtStripe)" opacity=".6" />
-        </svg>
-
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 9,
-            pointerEvents: "none",
-          }}
-        >
-          <div
-            style={{
-              fontFamily: font.mono,
-              fontSize: 11.5,
-              color: color.textFaint,
-              letterSpacing: "0.16em",
-              background: color.bg,
-              padding: "8px 15px",
-              border: "1px solid #232a2f",
-              borderRadius: 5,
-            }}
-          >
-            UNREAL ENGINE 5 · PIXEL STREAM
-          </div>
-          <div
-            className="dt-fade-swap"
-            key={camera}
-            style={{ fontFamily: font.mono, fontSize: 11.5, color: color.textLabel3, letterSpacing: "0.08em" }}
-          >
-            MALE UAV AIRFRAME · {CAMERA_VIEW_LABEL[camera]} · CLICK TO CAPTURE INPUT
-          </div>
-        </div>
-
-        <div style={{ position: "absolute", top: 13, left: 14, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 7,
-              fontFamily: font.mono,
-              fontSize: 11,
-              color: color.dangerSoft,
-              background: "rgba(11,13,15,.86)",
-              border: "1px solid #3d1f1c",
-              padding: "5px 9px",
-              borderRadius: 4,
-            }}
-          >
-            <span className="dt-pulse" style={{ width: 5, height: 5, borderRadius: "50%", background: running ? color.danger : color.textFaint }} />
-            {running ? "REPLAY · RUNNING" : "REPLAY · STOPPED"}
-          </span>
-          <span
-            style={{
-              fontFamily: font.mono,
-              fontSize: 11,
-              color: color.textMuted,
-              background: "rgba(11,13,15,.86)",
-              border: "1px solid #232a2f",
-              padding: "5px 9px",
-              borderRadius: 4,
-            }}
-          >
-            T+{hms(Math.round(t))} · ×{session.speed}
-          </span>
+        <div style={{ position: "absolute", inset: 0 }}>
+          <EngineScene sessionId={session.sessionId} />
         </div>
 
         <div style={{ position: "absolute", top: 13, right: 14, display: "flex", alignItems: "center", gap: 6 }}>
-          {CAMERAS.map(({ key, label }) => {
-            const s = tabStyle(camera === key);
-            return (
-              <div
-                key={key}
-                onClick={() => onCameraChange(key)}
-                className="dt-tab"
-                style={{
-                  fontFamily: font.mono,
-                  fontSize: 11,
-                  padding: "6px 9px",
-                  borderRadius: 4,
-                  cursor: "pointer",
-                  background: camera === key ? s.bg : "rgba(11,13,15,.86)",
-                  color: s.fg,
-                  border: "1px solid #232a2f",
-                }}
-              >
-                {label}
-              </div>
-            );
-          })}
           <div
             onClick={handleToggleFullscreen}
             className="dt-btn-ghost"

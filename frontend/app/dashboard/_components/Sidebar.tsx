@@ -96,27 +96,6 @@ export function Sidebar({
           borderBottom: `1px solid ${color.border}`,
         }}
       >
-        <div
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: 8,
-            background: color.tabOnBg,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flex: "0 0 30px",
-          }}
-        >
-          <div
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 2,
-              background: color.accent,
-            }}
-          />
-        </div>
         {!collapsed && (
           <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
             DRONEACHARAYA
