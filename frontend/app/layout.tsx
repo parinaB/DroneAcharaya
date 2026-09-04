@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DroneAcharaya",
+  title: "DRONEACHARAYA",
   description: "Predictive health monitoring and digital twin for MALE UAV piston engines",
 };
 

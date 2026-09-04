@@ -1,0 +1,13 @@
+{
+  "run_id": "UNIT-healthy-0001_M001",
+  "engine_id": "UNIT-healthy-0001",
+  "mission_id": "high_throttle_climb_heavy-M001",
+  "mission_shape": "high_throttle_climb_heavy",
+  "fault_class": "healthy",
+  "split": "train",
+  "accumulated_hours_at_start": null,
+  "n_rows": 300,
+  "duration_s": 299.0,
+  "export_rate_hz": 1,
+  "note": "Trimmed fixture extracted from data/raw/telemetry_train.csv + groundtruth_train.csv for local demo/testing."
+}

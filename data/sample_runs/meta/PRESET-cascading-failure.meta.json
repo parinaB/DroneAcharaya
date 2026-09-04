@@ -1,0 +1,30 @@
+{
+  "run_id": "PRESET-cascading-failure",
+  "n_rows": 121,
+  "duration_s": 120.0,
+  "export_rate_hz": 1,
+  "engine_id": "PRESET-cascading-failure",
+  "mission_id": "spliced-preset",
+  "mission_shape": "long_loiter",
+  "fault_class": "lubrication_degradation",
+  "fault_sequence": [
+    "lubrication_degradation",
+    "mechanical_vibration"
+  ],
+  "split": "train",
+  "accumulated_hours_at_start": null,
+  "note": "COMPOSED demo device, not real coupled physics. Splices two real single-fault missions on a continuous renumbered t axis: first 80s from real lubricationdegradation run UNIT-lubricationdegradation-0018_M003 rows 90-169 (oil_pump_health=0.5, declining oil_pressure signature, mid-CLIMB), then 41s from real mechanicalvibration run UNIT-mechanicalvibration-0063_M006 rows 90-130 (bearing_health=0.5, rising vibration_rms_x_bearing_proxy signature, also mid-CLIMB) appended immediately after. Both segments start already in CLIMB (not IDLE) so altitude/state vary from t=0 and the splice doesn't present as a nonsensical engine_state jump -- both donors are in CLIMB at their respective start rows. t is strictly monotonic across the splice. map/power identities hold per-row throughout since neither segment's torque/rpm/boost_pressure/ambient_pressure was modified. fault_class is set to the first/dominant phase (lubrication_degradation); fault_sequence carries both phases in order.",
+  "source_runs": [
+    "UNIT-lubricationdegradation-0018_M003",
+    "UNIT-mechanicalvibration-0063_M006"
+  ],
+  "splice": {
+    "segment_1_run": "UNIT-lubricationdegradation-0018_M003",
+    "segment_1_rows": 80,
+    "segment_1_source_start_row": 90,
+    "segment_2_run": "UNIT-mechanicalvibration-0063_M006",
+    "segment_2_rows": 41,
+    "segment_2_source_start_row": 90,
+    "splice_t": 80
+  }
+}

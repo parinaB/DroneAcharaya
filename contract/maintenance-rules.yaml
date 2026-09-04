@@ -1,0 +1,233 @@
+# =============================================================================
+# MAINTENANCE RULES (draft — sanity-check before it's wired into the API)
+# =============================================================================
+# Translates model health/RUL/sensor-fault output into maintenance
+# recommendations. Action/consequence text is pulled VERBATIM from
+# contract/failure-mode-matrix.csv's recommended_action/consequence columns —
+# do not paraphrase here; edit the matrix first if the wording needs to change.
+#
+# Tier bounds are in the health-parameter-registry.md convention already
+# established for every row below: 1.0 = healthy -> 0.0 = fully failed. All
+# thresholds are matched to the matrix's failure_criterion column (already in
+# this same 1.0->0.0 direction for injector_health_c{1..4}, cooling_health,
+# oil_pump_health, bearing_health, fuel_delivery_health, alternator_health) or
+# converted to it for the four originally-inverted rows below
+# (turbo_efficiency_deg, injection_timing_deg, combustion_stability,
+# misfire_rate_c{1..4}, all of which the matrix expresses as 0.0=healthy ->
+# 1.0=failed with a `>=` criterion) — same flip already applied in the
+# training notebooks' FAILURE_THRESHOLDS dict
+# (ml/training/lstm_rul/lstm_training.ipynb), reproduced here as the
+# `warning`/`critical` boundary so the two stay identical by construction:
+# threshold_here = 1.0 - matrix_threshold for those four.
+#
+# tiers.watch: parameter has moved off nominal but is not yet at the matrix's
+#   own failure_criterion — an early-warning band with no matrix-defined
+#   boundary of its own, so a single round-number split (0.6-0.85) is used
+#   for every rule rather than picking a bespoke number per fault. Reviewer:
+#   confirm 0.6/0.85 as the intended early-warning band, or supply per-fault
+#   watch bounds if the matrix's onset_profile column implies otherwise.
+# tiers.warning: matrix's failure_criterion boundary down to the watch floor
+#   (0.6). injector_health_c{1..4} and fuel_delivery_health both have a
+#   failure_criterion of exactly 0.6 -- the same value as the watch floor --
+#   so their warning band is empty by construction (min==max) and they jump
+#   directly from watch to critical. This falls out of the matrix's own
+#   numbers, not an authoring error; flagging in case a distinct warning
+#   band is wanted for these two.
+# tiers.critical: 0.0 up to the matrix's failure_criterion — i.e. already past
+#   the matrix's own definition of failed/mission-critical.
+#
+# severity_rank: MY judgment call from the matrix's consequence column
+# (lower = more severe = surfaces first when multiple faults fire at once).
+# Please review — flagged inline per row below, not treated as final.
+#   1  bearing_health          -- "Mechanical failure risk" / seizure risk,
+#                                  crank/bearing assembly; historically the
+#                                  most catastrophic and least gracefully
+#                                  degrading failure mode in the matrix.
+#   2  oil_pump_health         -- "Bearing wear progression; mechanical
+#                                  failure risk" -- feeds directly into #1 if
+#                                  unaddressed, so ranked just behind it.
+#   3  cooling_health          -- "Overheat; possible power derate needed" --
+#                                  can force an immediate in-flight power
+#                                  reduction, safety-time-critical.
+#   4  fuel_delivery_health    -- "Torque deficit / instability at power" --
+#                                  only manifests at high load, but can appear
+#                                  suddenly (blockage) with no ramp warning.
+#   5  turbo_efficiency_deg    -- "Power loss + high EGT at altitude" --
+#                                  altitude-gated, narrower operating window
+#                                  than fuel/cooling.
+#   6  injector_health_c1..c4  -- "Power loss + thermal stress on affected
+#                                  cylinder" -- single-cylinder, engine
+#                                  remains flyable on remaining cylinders.
+#   7  alternator_health       -- "Loss of electrical power over time" --
+#                                  slow-onset, battery buffers it initially.
+#   8  injection_timing_deg    -- "Combustion efficiency loss + thermal
+#                                  stress" -- affects all cylinders but is a
+#                                  calibration issue, not a mechanical one.
+#   9  combustion_stability    -- "Efficiency loss; rough operation" --
+#                                  efficiency-only consequence in the matrix,
+#                                  no structural risk language.
+#  10  misfire_rate_c1..c4     -- "Rough running; power loss; downstream
+#                                  damage" -- intermittent/event-based rather
+#                                  than a sustained degrading trend.
+# =============================================================================
+
+rules:
+  - health_parameter: injector_health_c1
+    component: "Cylinder 1 injector"
+    tiers:
+      watch:    { min: 0.6, max: 0.85, action: "Flag injector 1 for inspection; monitor trend" }
+      warning:  { min: 0.6, max: 0.6,  action: "Flag injector 1 for inspection; monitor trend" }
+      critical: { min: 0.0, max: 0.6,  action: "Flag injector 1 for inspection; monitor trend" }
+    consequence: "Power loss + thermal stress on affected cylinder"
+    severity_rank: 6
+
+  - health_parameter: injector_health_c2
+    component: "Cylinder 2 injector"
+    tiers:
+      watch:    { min: 0.6, max: 0.85, action: "Flag injector 2 for inspection; monitor trend" }
+      warning:  { min: 0.6, max: 0.6,  action: "Flag injector 2 for inspection; monitor trend" }
+      critical: { min: 0.0, max: 0.6,  action: "Flag injector 2 for inspection; monitor trend" }
+    consequence: "Power loss + thermal stress on affected cylinder"
+    severity_rank: 6
+
+  - health_parameter: injector_health_c3
+    component: "Cylinder 3 injector"
+    tiers:
+      watch:    { min: 0.6, max: 0.85, action: "Flag injector 3 for inspection; monitor trend" }
+      warning:  { min: 0.6, max: 0.6,  action: "Flag injector 3 for inspection; monitor trend" }
+      critical: { min: 0.0, max: 0.6,  action: "Flag injector 3 for inspection; monitor trend" }
+    consequence: "Power loss + thermal stress on affected cylinder"
+    severity_rank: 6
+
+  - health_parameter: injector_health_c4
+    component: "Cylinder 4 injector"
+    tiers:
+      watch:    { min: 0.6, max: 0.85, action: "Flag injector 4 for inspection; monitor trend" }
+      warning:  { min: 0.6, max: 0.6,  action: "Flag injector 4 for inspection; monitor trend" }
+      critical: { min: 0.0, max: 0.6,  action: "Flag injector 4 for inspection; monitor trend" }
+    consequence: "Power loss + thermal stress on affected cylinder"
+    severity_rank: 6
+
+  - health_parameter: cooling_health
+    component: "Cooling system"
+    tiers:
+      watch:    { min: 0.5, max: 0.85, action: "Advise reduce power / descend / abort" }
+      warning:  { min: 0.5, max: 0.6,  action: "Advise reduce power / descend / abort" }
+      critical: { min: 0.0, max: 0.5,  action: "Advise reduce power / descend / abort" }
+    consequence: "Overheat; possible power derate needed"
+    severity_rank: 3
+
+  - health_parameter: oil_pump_health
+    component: "Oil pump / lubrication delivery"
+    tiers:
+      watch:    { min: 0.5, max: 0.85, action: "Schedule lube/bearing inspection; watch RUL" }
+      warning:  { min: 0.5, max: 0.6,  action: "Schedule lube/bearing inspection; watch RUL" }
+      critical: { min: 0.0, max: 0.5,  action: "Schedule lube/bearing inspection; watch RUL" }
+    consequence: "Bearing wear progression; mechanical failure risk"
+    severity_rank: 2
+
+  - health_parameter: bearing_health
+    component: "Crank / main bearings"
+    tiers:
+      watch:    { min: 0.5, max: 0.85, action: "Inspect crank/bearing assembly" }
+      warning:  { min: 0.5, max: 0.6,  action: "Inspect crank/bearing assembly" }
+      critical: { min: 0.0, max: 0.5,  action: "Inspect crank/bearing assembly" }
+    consequence: "Mechanical failure risk"
+    severity_rank: 1
+
+  - health_parameter: fuel_delivery_health
+    component: "Fuel supply / rail"
+    tiers:
+      watch:    { min: 0.6, max: 0.85, action: "Inspect fuel supply/filter" }
+      warning:  { min: 0.6, max: 0.6,  action: "Inspect fuel supply/filter" }
+      critical: { min: 0.0, max: 0.6,  action: "Inspect fuel supply/filter" }
+    consequence: "Torque deficit / instability at power"
+    severity_rank: 4
+
+  - health_parameter: alternator_health
+    component: "Alternator"
+    tiers:
+      watch:    { min: 0.5, max: 0.85, action: "Inspect/replace alternator" }
+      warning:  { min: 0.5, max: 0.6,  action: "Inspect/replace alternator" }
+      critical: { min: 0.0, max: 0.5,  action: "Inspect/replace alternator" }
+    consequence: "Loss of electrical power over time"
+    severity_rank: 7
+
+  # --- Originally 0.0=healthy -> 1.0=failed rows in the matrix; thresholds
+  # --- below are 1 - matrix_threshold, matching FAILURE_THRESHOLDS' own flip.
+  #
+  # No watch tier for these four: their failure threshold sits at/above the
+  # generic 0.85 watch ceiling used for the _health rows (e.g. misfire_rate_c1
+  # fails at 0.9, which is already past 0.85), and the matrix gives no
+  # separate early-warning boundary for them. watch is set to an empty/
+  # never-fires band (min == max == the warning boundary) by explicit user
+  # decision -- these go straight from healthy to warning/critical.
+  - health_parameter: turbo_efficiency_deg
+    component: "Turbocharger"
+    tiers:
+      watch:    { min: 0.3, max: 0.3,  action: "Limit altitude/power; inspect turbo" }
+      warning:  { min: 0.3, max: 0.3,  action: "Limit altitude/power; inspect turbo" }
+      critical: { min: 0.0, max: 0.3,  action: "Limit altitude/power; inspect turbo" }
+    consequence: "Power loss + high EGT at altitude"
+    severity_rank: 5
+
+  - health_parameter: injection_timing_deg
+    component: "ECU / injection timing"
+    tiers:
+      watch:    { min: 0.4, max: 0.4,  action: "Recalibrate injection timing" }
+      warning:  { min: 0.4, max: 0.4,  action: "Recalibrate injection timing" }
+      critical: { min: 0.0, max: 0.4,  action: "Recalibrate injection timing" }
+    consequence: "Combustion efficiency loss + thermal stress"
+    severity_rank: 8
+
+  - health_parameter: combustion_stability
+    component: "Combustion (per-cylinder burn)"
+    tiers:
+      watch:    { min: 0.5, max: 0.5,  action: "Inspect fuel/injection/compression" }
+      warning:  { min: 0.5, max: 0.5,  action: "Inspect fuel/injection/compression" }
+      critical: { min: 0.0, max: 0.5,  action: "Inspect fuel/injection/compression" }
+    consequence: "Efficiency loss; rough operation"
+    severity_rank: 9
+
+  - health_parameter: misfire_rate_c1
+    component: "Cylinder 1 combustion (misfire)"
+    tiers:
+      watch:    { min: 0.9, max: 0.9,  action: "Inspect cylinder 1 injection/compression" }
+      warning:  { min: 0.9, max: 0.9,  action: "Inspect cylinder 1 injection/compression" }
+      critical: { min: 0.0, max: 0.9,  action: "Inspect cylinder 1 injection/compression" }
+    consequence: "Rough running; power loss; downstream damage"
+    severity_rank: 10
+
+  - health_parameter: misfire_rate_c2
+    component: "Cylinder 2 combustion (misfire)"
+    tiers:
+      watch:    { min: 0.9, max: 0.9,  action: "Inspect cylinder 2 injection/compression" }
+      warning:  { min: 0.9, max: 0.9,  action: "Inspect cylinder 2 injection/compression" }
+      critical: { min: 0.0, max: 0.9,  action: "Inspect cylinder 2 injection/compression" }
+    consequence: "Rough running; power loss; downstream damage"
+    severity_rank: 10
+
+  - health_parameter: misfire_rate_c3
+    component: "Cylinder 3 combustion (misfire)"
+    tiers:
+      watch:    { min: 0.9, max: 0.9,  action: "Inspect cylinder 3 injection/compression" }
+      warning:  { min: 0.9, max: 0.9,  action: "Inspect cylinder 3 injection/compression" }
+      critical: { min: 0.0, max: 0.9,  action: "Inspect cylinder 3 injection/compression" }
+    consequence: "Rough running; power loss; downstream damage"
+    severity_rank: 10
+
+  - health_parameter: misfire_rate_c4
+    component: "Cylinder 4 combustion (misfire)"
+    tiers:
+      watch:    { min: 0.9, max: 0.9,  action: "Inspect cylinder 4 injection/compression" }
+      warning:  { min: 0.9, max: 0.9,  action: "Inspect cylinder 4 injection/compression" }
+      critical: { min: 0.0, max: 0.9,  action: "Inspect cylinder 4 injection/compression" }
+    consequence: "Rough running; power loss; downstream damage"
+    severity_rank: 10
+
+sensor_fault_rules:
+  BIAS:    { action: "Recalibrate sensor" }
+  DRIFT:   { action: "Recalibrate sensor; monitor drift rate" }
+  NOISE:   { action: "Inspect wiring/connector for interference" }
+  STUCK:   { action: "Replace sensor — frozen reading" }
+  DROPOUT: { action: "Inspect sensor connection — intermittent/missing signal" }

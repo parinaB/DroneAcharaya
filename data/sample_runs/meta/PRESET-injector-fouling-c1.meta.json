@@ -1,0 +1,16 @@
+{
+  "run_id": "PRESET-injector-fouling-c1",
+  "n_rows": 121,
+  "duration_s": 120.0,
+  "export_rate_hz": 1,
+  "engine_id": "PRESET-injector-fouling-c1",
+  "mission_id": "long_loiter-preset",
+  "mission_shape": "long_loiter",
+  "fault_class": "injector_degradation",
+  "split": "train",
+  "accumulated_hours_at_start": null,
+  "note": "Extracted from real injectordegradation run UNIT-injectordegradation-0009_M006, rows 90-210 (renumbered t=0..120). injector_health_c1=0.4 for the whole mission, well past the failure_criterion threshold (<=0.6). Other cylinders (c2-c4) stay at 1.0 healthy. No modification beyond trimming/renumbering t. [Window starts mid-CLIMB (not at engine start-up) so altitude/engine_state/throttle vary from t=0 instead of sitting at IDLE/altitude=0 for the first ~60-90s of the original mission.]",
+  "source_runs": [
+    "UNIT-injectordegradation-0009_M006"
+  ]
+}

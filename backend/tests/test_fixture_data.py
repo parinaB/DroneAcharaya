@@ -87,18 +87,37 @@ def test_time_is_monotonic(run_id: str) -> None:
     assert (df["t"].diff().dropna() > 0).all()
 
 
+# Preset fixtures that deliberately inject a SYNTHETIC sensor fault on a channel beyond
+# cht_c3 (the only channel with a real sensor-fault path in the raw simulated dataset) --
+# see each run's meta.json "note"/"synthetic_composition" field for the exact injection.
+# Keyed by run_id so this stays a narrow, explicit exception rather than weakening the
+# check for every fixture.
+KNOWN_SYNTHETIC_SENSOR_FAULT_CHANNELS = {
+    "PRESET-egt-sensor-drift": {"egt_c1"},
+    "PRESET-confusable-pair": {"battery_voltage"},
+}
+
+
 def test_only_cht_c3_carries_a_sensor_fault_path(run_id: str) -> None:
     """data/README.md: every other telemetry channel equals its groundtruth
-    `_true` value exactly."""
+    `_true` value exactly -- except a fixture's own documented synthetic
+    sensor-fault channel(s), see KNOWN_SYNTHETIC_SENSOR_FAULT_CHANNELS above."""
     telemetry = pd.read_csv(SAMPLE_RUNS_DIR / "telemetry" / f"{run_id}.csv")
     groundtruth = pd.read_csv(SAMPLE_RUNS_DIR / "groundtruth" / f"{run_id}_groundtruth.csv")
+    exempt = KNOWN_SYNTHETIC_SENSOR_FAULT_CHANNELS.get(run_id, set())
     for col in ["cht_c1", "egt_c1", "oil_pressure", "fuel_flow", "rpm"]:
+        if col in exempt:
+            assert not (telemetry[col].to_numpy() == groundtruth[f"{col}_true"].to_numpy()).all(), (
+                f"{col} was expected to carry a synthetic sensor-fault corruption but matches groundtruth exactly"
+            )
+            continue
         assert (telemetry[col].to_numpy() == groundtruth[f"{col}_true"].to_numpy()).all(), col
 
 
 def test_cross_signal_identities_hold(run_id: str) -> None:
     df = pd.read_csv(SAMPLE_RUNS_DIR / "telemetry" / f"{run_id}.csv")
-    assert (df["map"] - (df["ambient_pressure"] + df["boost_pressure"])).abs().max() < 1e-6
+    # boost_pressure is in bar (see data/README.md), map/ambient_pressure in kPa
+    assert (df["map"] - (df["ambient_pressure"] + df["boost_pressure"] * 100)).abs().max() < 1e-6
     expected_power = df["torque"] * df["rpm"] * 2 * 3.141592653589793 / 60 / 1000
     assert (df["power"] - expected_power).abs().max() < 1e-6
 

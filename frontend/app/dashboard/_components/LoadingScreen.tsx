@@ -95,7 +95,7 @@ export function LoadingScreen({ onDone }: { onDone: () => void }) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "0.12em" }}>DRONE-ACHARYA</div>
+          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "0.12em" }}>DRONEACHARAYA</div>
           <div
             style={{
               fontFamily: font.mono,

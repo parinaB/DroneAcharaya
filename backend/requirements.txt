@@ -3,6 +3,7 @@ fastapi
 uvicorn[standard]
 pydantic
 pydantic-settings
+pyyaml
 numpy
 pandas
 # Pinned to the version ml/artifacts/lstm_rul/v1's scaler.joblib/
