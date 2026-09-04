@@ -145,7 +145,7 @@ class MaintenanceRuleEngine:
             )
         return self._sort_engine_recommendations(recommendations)
 
-    def evaluate_sensor_faults(self, sensor_fault_preds: dict[str, str]) -> list[dict[str, Any]]:
+    def evaluate_sensor_faults(self, sensor_fault_preds: dict[str, str | None]) -> list[dict[str, Any]]:
         """One recommendation per channel whose prediction isn't NONE/None."""
         recommendations: list[dict[str, Any]] = []
         for channel, fault_type in sensor_fault_preds.items():
@@ -166,7 +166,7 @@ class MaintenanceRuleEngine:
         self,
         health_values: dict[str, float],
         rul_hours: float | None,
-        sensor_fault_preds: dict[str, str],
+        sensor_fault_preds: dict[str, str | None],
     ) -> dict[str, list[dict[str, Any]]]:
         return {
             "engine_recommendations": self.evaluate_health(health_values, rul_hours),

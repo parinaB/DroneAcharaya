@@ -7,12 +7,12 @@ this is an additive interpretation layer on top of the same HealthScore row
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import get_settings
 from app.db.base import get_db
 from app.db.models import HealthScore
 from app.maintenance.rule_engine import MaintenanceRuleEngine, MaintenanceRuleEngineError
@@ -20,12 +20,17 @@ from app.maintenance.schemas import MaintenanceEvaluateRequest, MaintenanceRepor
 
 router = APIRouter(prefix="/advisory", tags=["advisory"])
 
+# Resolved from this file's own location, not settings.data_dir (which is
+# CWD-relative, e.g. "../data") -- CI and some test runners invoke pytest
+# from the repo root rather than backend/, where a CWD-relative path would
+# point at a nonexistent directory. backend/app/modules/advisory/routes.py
+# -> repo root is 4 parents up.
+_RULES_PATH = Path(__file__).resolve().parents[3].parent / "contract" / "maintenance-rules.yaml"
+
 
 @lru_cache
 def get_rule_engine() -> MaintenanceRuleEngine:
-    settings = get_settings()
-    rules_path = settings.data_dir.parent / "contract" / "maintenance-rules.yaml"
-    return MaintenanceRuleEngine(rules_path)
+    return MaintenanceRuleEngine(_RULES_PATH)
 
 
 @router.get("/latest", response_model=MaintenanceReport)
@@ -46,7 +51,7 @@ async def latest_advisory(
         "bearing_vibration": row.sensor_fault_bearing_vibration,
     }
     report = engine.evaluate(row.health_parameters, row.rul_estimate_hours, sensor_fault_preds)
-    return MaintenanceReport(**report)
+    return MaintenanceReport.model_validate(report)
 
 
 @router.post("/evaluate", response_model=MaintenanceReport)
@@ -63,4 +68,4 @@ async def evaluate_advisory(
         report = engine.evaluate(body.health_parameters, body.rul_hours, body.sensor_fault_preds)
     except MaintenanceRuleEngineError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return MaintenanceReport(**report)
+    return MaintenanceReport.model_validate(report)
