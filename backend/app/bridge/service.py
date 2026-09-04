@@ -25,13 +25,14 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.bridge.broadcast import broadcaster
+from app.bridge.broadcast import BroadcastTick, broadcaster
 from app.bridge.sources import ReplaySource
 from app.core.config import get_settings
 from app.core.model_loader import LSTM_SEQ_LEN, XGB_ROLLING_WINDOW
 from app.db.base import SessionLocal
 from app.db.writer import ensure_run, write_health_score, write_telemetry
 from app.modules.inference.ground_truth import GroundTruthLookup
+from app.modules.inference.schemas import HealthScoreOut
 from app.modules.inference.service import (
     get_health_score,
     try_load_autoencoder_bundle,
@@ -96,7 +97,6 @@ class BridgeService:
                     return
 
                 write_telemetry(db, self.run_id, self.session_id, frame)
-                broadcaster.publish(self.session_id, frame)
                 self._frame_window.append(frame)
 
                 groundtruth_row = self._ground_truth.row_at_index(i)
@@ -116,12 +116,16 @@ class BridgeService:
                     ae_bundle=self._ae_bundle,
                     ae_frame=frame if self._ae_bundle is not None else None,
                 )
-                write_health_score(
+                health_row = write_health_score(
                     db,
                     self.run_id,
                     self.session_id,
                     frame.t,
                     **health,
+                )
+                broadcaster.publish(
+                    self.session_id,
+                    BroadcastTick(frame=frame, health=HealthScoreOut.model_validate(health_row)),
                 )
 
                 self.state.last_t = frame.t
