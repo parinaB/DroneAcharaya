@@ -7,6 +7,7 @@
 import type {
   HealthScoreOut,
   LatestFrameOut,
+  MaintenanceReport,
   RunSummary,
   SessionStatusOut,
   StartReplayResponse,
@@ -105,4 +106,35 @@ export function getLatestHealthScore(sessionId: string) {
   return apiFetch<HealthScoreOut>(
     `/api/v1/inference/latest?session_id=${encodeURIComponent(sessionId)}`,
   );
+}
+
+/** GET /api/v1/advisory/latest?session_id= — maintenance recommendations
+ * from contract/maintenance-rules.yaml's rule engine, derived from the same
+ * HealthScore row /inference/latest reads. Empty lists (not a 404) until a
+ * health score with health_parameters has landed for this session. */
+export function getLatestAdvisory(sessionId: string) {
+  return apiFetch<MaintenanceReport>(
+    `/api/v1/advisory/latest?session_id=${encodeURIComponent(sessionId)}`,
+  );
+}
+
+/** POST /api/v1/advisory/evaluate — runs the same rule engine against an
+ * arbitrary snapshot instead of the latest HealthScore row. Used to
+ * aggregate a whole run's worst-per-parameter health values (and every
+ * sensor-fault class ever seen) into one report, so a fault that was
+ * critical mid-run still shows up even if a different fault was active in
+ * the final frame. */
+export function evaluateAdvisory(
+  healthParameters: Record<string, number>,
+  rulHours: number | null,
+  sensorFaultPreds: Record<string, string | null>,
+) {
+  return apiFetch<MaintenanceReport>("/api/v1/advisory/evaluate", {
+    method: "POST",
+    body: JSON.stringify({
+      health_parameters: healthParameters,
+      rul_hours: rulHours,
+      sensor_fault_preds: sensorFaultPreds,
+    }),
+  });
 }

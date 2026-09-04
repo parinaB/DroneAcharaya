@@ -219,7 +219,8 @@ again any time the simulation scripts change. It checks, per mission:
   counts, time monotonicity.
 - **Physical bounds** — RPM/power/temperature/pressure/altitude against the
   published EASA TCDS limits in `contract/parameter-source-table.csv`.
-- **Cross-signal consistency** — `map = ambient_pressure + boost_pressure`,
+- **Cross-signal consistency** — `map = ambient_pressure + boost_pressure*100`
+  (unit conversion: `boost_pressure` is bar, `map`/`ambient_pressure` are kPa),
   `power = torque*rpm*2pi/60/1000`.
 - **Fault-signature correctness** — for each mission's assigned `fault_class`
   and its θ severity (from `meta.json`), checks the SPECIFIC discriminator

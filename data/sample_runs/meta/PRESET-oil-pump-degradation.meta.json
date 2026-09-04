@@ -1,0 +1,16 @@
+{
+  "run_id": "PRESET-oil-pump-degradation",
+  "n_rows": 121,
+  "duration_s": 120.0,
+  "export_rate_hz": 1,
+  "engine_id": "PRESET-oil-pump-degradation",
+  "mission_id": "long_loiter-preset",
+  "mission_shape": "long_loiter",
+  "fault_class": "lubrication_degradation",
+  "split": "train",
+  "accumulated_hours_at_start": null,
+  "note": "Extracted from real lubricationdegradation run UNIT-lubricationdegradation-0018_M003, rows 90-210 (renumbered t=0..120) -- a DIFFERENT run from the pre-existing UNIT-lubricationdegradation-0016_M001 fixture. oil_pump_health=0.5, at the failure_criterion threshold (<=0.5). Visible as oil_pressure dropping to ~0.24 bar minimum. fault_class uses the canonical contract/health-parameter-registry.md name (lubrication_degradation). No modification beyond trimming/renumbering t. [Window starts mid-CLIMB (not at engine start-up) so altitude/engine_state/throttle vary from t=0 instead of sitting at IDLE/altitude=0 for the first ~60-90s of the original mission.]",
+  "source_runs": [
+    "UNIT-lubricationdegradation-0018_M003"
+  ]
+}

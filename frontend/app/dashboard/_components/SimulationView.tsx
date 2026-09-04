@@ -1,9 +1,23 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import { altLabel, chtLabel, hms, mixLabel, oatLabel, rpmLabel } from "../_lib/format";
+import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  barLabel,
+  celsiusLabel,
+  faultTypeLabel,
+  gLabel,
+  hms,
+  hoursLabel,
+  kgPerHourLabel,
+  kPaLabel,
+  oatLabel,
+  rpmLabel,
+} from "../_lib/format";
 import { cardTabStyle, color, font, glowVars, tabStyle } from "../_lib/tokens";
-import { SCENARIOS, SIM_RUN_LENGTH, type Camera, type SimParams, type XaiTab } from "../_lib/state";
+import { type Camera, type XaiTab } from "../_lib/state";
+import { PRESET_CATEGORIES, isRulDeclining, presetCategory, presetLabel, type PresetCategory, type ReplaySession } from "../_lib/useReplaySession";
+import type { RunSummary } from "../../../lib/types";
+import { RulChart } from "./RulChart";
 
 const SPEEDS = [1, 2, 5, 10] as const;
 const CAMERAS: { key: Camera; label: string }[] = [
@@ -17,46 +31,32 @@ const CAMERA_VIEW_LABEL: Record<Camera, string> = {
   thermal: "THERMAL OVERLAY",
 };
 const XAI_TABS: { key: XaiTab; label: string }[] = [
-  { key: "drivers", label: "Drivers" },
-  { key: "residual", label: "Residual" },
-  { key: "reasoning", label: "Reasoning" },
+  { key: "drivers", label: "Signals" },
+  { key: "reasoning", label: "Summary" },
 ];
 
+/** health_index is 0-100, 100 = perfectly healthy. Below this value the UI
+ * treats the engine as unhealthy (red); at or above it, healthy (green) --
+ * a value-based rule, independent of whatever fault_type the model reports. */
+const HEALTH_INDEX_DANGER_THRESHOLD = 70;
+
+function isHealthCritical(healthIndex: number | null | undefined): boolean {
+  return healthIndex !== null && healthIndex !== undefined && healthIndex < HEALTH_INDEX_DANGER_THRESHOLD;
+}
+
 export interface SimulationViewProps {
-  scenario: number;
-  onScenarioChange: (i: number) => void;
-  params: SimParams;
-  playing: boolean;
-  onTogglePlay: () => void;
-  speed: number;
-  onSpeedChange: (speed: number) => void;
-  t: number;
-  onSeek: (t: number) => void;
+  session: ReplaySession;
   camera: Camera;
   onCameraChange: (camera: Camera) => void;
   xai: XaiTab;
   onXaiChange: (xai: XaiTab) => void;
   fullscreen: boolean;
   onToggleFullscreen: () => void;
+  /** Navigates to the Analytics screen -- offered once a run has completed. */
+  onGoToAnalytics: () => void;
 }
 
-export function SimulationView({
-  scenario,
-  onScenarioChange,
-  params,
-  playing,
-  onTogglePlay,
-  speed,
-  onSpeedChange,
-  t,
-  onSeek,
-  camera,
-  onCameraChange,
-  xai,
-  onXaiChange,
-  fullscreen,
-  onToggleFullscreen,
-}: SimulationViewProps) {
+export function SimulationView({ session, camera, onCameraChange, xai, onXaiChange, fullscreen, onToggleFullscreen, onGoToAnalytics }: SimulationViewProps) {
   return (
     <div
       style={{
@@ -67,32 +67,37 @@ export function SimulationView({
         overflow: "hidden",
       }}
     >
-      <ScenarioPanel scenario={scenario} onScenarioChange={onScenarioChange} />
-      <Viewport
-        playing={playing}
-        onTogglePlay={onTogglePlay}
-        speed={speed}
-        onSpeedChange={onSpeedChange}
-        t={t}
-        onSeek={onSeek}
-        camera={camera}
-        onCameraChange={onCameraChange}
-        params={params}
-        fullscreen={fullscreen}
-        onToggleFullscreen={onToggleFullscreen}
-      />
-      <TelemetryPanel params={params} xai={xai} onXaiChange={onXaiChange} />
+      <PresetPanel session={session} />
+      <Viewport session={session} camera={camera} onCameraChange={onCameraChange} fullscreen={fullscreen} onToggleFullscreen={onToggleFullscreen} onGoToAnalytics={onGoToAnalytics} />
+      <TelemetryPanel session={session} xai={xai} onXaiChange={onXaiChange} />
     </div>
   );
 }
 
-function ScenarioPanel({
-  scenario,
-  onScenarioChange,
-}: {
-  scenario: number;
-  onScenarioChange: (i: number) => void;
-}) {
+function PresetPanel({ session }: { session: ReplaySession }) {
+  const { runs, selectedRunId, selectAndStart, phase, status } = session;
+  const disabled = phase === "starting";
+
+  const runsByCategory = useMemo(() => {
+    const grouped = new Map<PresetCategory, RunSummary[]>();
+    for (const run of runs) {
+      const cat = presetCategory(run);
+      const list = grouped.get(cat) ?? [];
+      list.push(run);
+      grouped.set(cat, list);
+    }
+    return grouped;
+  }, [runs]);
+
+  // Accordion: at most one category open at a time. The category containing
+  // the currently selected run starts expanded; opening another closes it.
+  const [openCategory, setOpenCategory] = useState<PresetCategory | null>(
+    () => (runs.length > 0 ? presetCategory(runs[0]) : null),
+  );
+  const toggleCategory = (cat: PresetCategory) => {
+    setOpenCategory((prev) => (prev === cat ? null : cat));
+  };
+
   return (
     <div
       style={{
@@ -106,54 +111,138 @@ function ScenarioPanel({
       }}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: "0 0 auto" }}>
-        <SectionLabel>SCENARIO</SectionLabel>
-        {SCENARIOS.map((s, i) => {
-          const t = cardTabStyle(scenario === i);
-          const active = scenario === i;
+        <SectionLabel>PRESET</SectionLabel>
+        {phase === "loading_runs" && (
+          <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.textFaint }}>Loading presets…</div>
+        )}
+        {phase === "no_runs" && (
+          <div style={{ fontFamily: font.mono, fontSize: 11.5, color: color.textFaint, lineHeight: 1.5 }}>
+            No runs available -- data/sample_runs/ is empty.
+          </div>
+        )}
+        {PRESET_CATEGORIES.map((cat) => {
+          const catRuns = runsByCategory.get(cat);
+          if (!catRuns || catRuns.length === 0) return null;
+          const isOpen = openCategory === cat;
           return (
-            <div
-              key={s.title}
-              onClick={() => onScenarioChange(i)}
-              className="dt-tab dt-scenario-card"
-              style={{
-                padding: "14px 15px",
-                borderRadius: 9,
-                cursor: "pointer",
-                background: t.bg,
-                boxShadow: t.ring,
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: "50%",
-                    background: s.critical ? color.danger : color.accent,
-                    flex: "0 0 auto",
-                  }}
-                />
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: t.fg }}>{s.title}</div>
+            <div key={cat} style={{ display: "flex", flexDirection: "column", gap: isOpen ? 8 : 0 }}>
+              <div
+                onClick={() => toggleCategory(cat)}
+                className="dt-tab"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "9px 12px",
+                  borderRadius: 7,
+                  cursor: "pointer",
+                  background: color.wellBg,
+                  border: `1px solid ${color.border}`,
+                }}
+              >
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: color.text }}>
+                  {cat} ({catRuns.length})
+                </span>
+                <span style={{ fontFamily: font.mono, fontSize: 11, color: color.textLabel, transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 120ms ease" }}>
+                  ▶
+                </span>
               </div>
-              <div style={{ fontFamily: font.mono, fontSize: 11, color: active ? color.textMuted : color.textLabel }}>
-                {s.subtitle}
-              </div>
-              <div style={{ fontSize: 12, lineHeight: 1.5, color: active ? color.textDim : color.textLabel }}>
-                {s.detail}
-              </div>
+              {isOpen &&
+                catRuns.map((run) => {
+                  const active = run.run_id === selectedRunId;
+                  const t = cardTabStyle(active);
+                  const critical = run.fault_class !== null && run.fault_class !== "healthy";
+                  return (
+                    <div
+                      key={run.run_id}
+                      onClick={() => !disabled && selectAndStart(run.run_id)}
+                      className="dt-tab dt-scenario-card"
+                      style={{
+                        padding: "12px 14px",
+                        marginLeft: 6,
+                        borderRadius: 9,
+                        cursor: disabled ? "default" : "pointer",
+                        opacity: disabled && !active ? 0.5 : 1,
+                        background: t.bg,
+                        boxShadow: t.ring,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 5,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: "50%",
+                            background: critical ? color.danger : color.accent,
+                            flex: "0 0 auto",
+                          }}
+                        />
+                        <div style={{ fontSize: 13, fontWeight: 600, color: t.fg }}>{presetLabel(run)}</div>
+                      </div>
+                      <div style={{ fontFamily: font.mono, fontSize: 10.5, color: active ? color.textMuted : color.textLabel }}>
+                        {run.mission_shape ?? "—"} · {run.duration_s !== null ? `${run.duration_s.toFixed(0)}s` : "—"}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           );
         })}
       </div>
 
+      <div style={{ borderTop: `1px solid ${color.border}`, paddingTop: 18, display: "flex", flexDirection: "column", gap: 10, flex: "0 0 auto" }}>
+        <div style={{ display: "flex", gap: 2, padding: 3, background: color.wellBg, border: `1px solid ${color.border}`, borderRadius: 7 }}>
+          {SPEEDS.map((s) => {
+            const st = tabStyle(session.speed === s);
+            return (
+              <div
+                key={s}
+                onClick={() => !disabled && session.setSpeed(s)}
+                className="dt-tab"
+                style={{
+                  flex: "1 1 0",
+                  textAlign: "center",
+                  padding: "6px 4px",
+                  borderRadius: 4,
+                  fontFamily: font.mono,
+                  fontSize: 11,
+                  cursor: disabled ? "default" : "pointer",
+                  opacity: disabled ? 0.5 : 1,
+                  background: st.bg,
+                  color: st.fg,
+                }}
+              >
+                {s}×
+              </div>
+            );
+          })}
+        </div>
+        {phase === "running" ? (
+          <button onClick={session.stop} style={sessionButtonStyle}>
+            Stop session
+          </button>
+        ) : (
+          <button
+            onClick={() => session.start()}
+            disabled={phase === "loading_runs" || phase === "starting" || !selectedRunId}
+            style={sessionButtonStyle}
+          >
+            {phase === "starting" ? "Starting…" : "Restart selected preset"}
+          </button>
+        )}
+        {phase === "error" && (
+          <div style={{ fontFamily: font.mono, fontSize: 11, color: color.danger, lineHeight: 1.5 }}>{session.errorMessage}</div>
+        )}
+      </div>
+
       <div style={{ borderTop: `1px solid ${color.border}`, paddingTop: 18, display: "flex", flexDirection: "column", gap: 8, flex: "0 0 auto" }}>
         <SectionLabel>TWIN SYNC</SectionLabel>
-        <SyncRow label="MODEL STEP" value="2 ms" />
-        <SyncRow label="SYNC ERROR" value="0.8%" />
-        <SyncRow label="UE5 STREAM" value="60 fps · 1440p" />
+        <SyncRow label="SESSION" value={status?.status ?? (phase === "running" ? "starting" : "idle")} />
+        <SyncRow label="FRAMES WRITTEN" value={status?.frames_written?.toString() ?? "0"} />
+        <SyncRow label="MODEL" value="lstm_rul + xgboost + autoencoder" />
       </div>
     </div>
   );
@@ -169,48 +258,38 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function SyncRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 12, color: color.textLabel }}>
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontFamily: font.mono, fontSize: 11.5, color: color.textLabel }}>
       <span>{label}</span>
-      <span style={{ color: color.accent }}>{value}</span>
+      <span style={{ color: color.accent, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</span>
     </div>
   );
 }
 
 function Viewport({
-  playing,
-  onTogglePlay,
-  speed,
-  onSpeedChange,
-  t,
-  onSeek,
+  session,
   camera,
   onCameraChange,
-  params,
   fullscreen,
   onToggleFullscreen,
+  onGoToAnalytics,
 }: {
-  playing: boolean;
-  onTogglePlay: () => void;
-  speed: number;
-  onSpeedChange: (speed: number) => void;
-  t: number;
-  onSeek: (t: number) => void;
+  session: ReplaySession;
   camera: Camera;
   onCameraChange: (camera: Camera) => void;
-  params: SimParams;
   fullscreen: boolean;
   onToggleFullscreen: () => void;
+  onGoToAnalytics: () => void;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
-  const pct = (t / SIM_RUN_LENGTH) * 100;
-  const [exported, setExported] = useState(false);
-  const exportTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleExport = useCallback(() => {
-    setExported(true);
-    if (exportTimer.current) clearTimeout(exportTimer.current);
-    exportTimer.current = setTimeout(() => setExported(false), 1800);
-  }, []);
+  const { phase, status, health, lastCompletedRun } = session;
+  const running = phase === "running";
+  // The button appears once a run has finished (lastCompletedRun exists) and
+  // no other run is currently starting/playing -- otherwise it would show the
+  // PREVIOUS run's "complete" banner while a new one is actively in progress.
+  const showAnalyticsButton = lastCompletedRun !== null && !running && phase !== "starting";
+  const durationS = session.runs.find((r) => r.run_id === session.selectedRunId)?.duration_s ?? null;
+  const t = status?.last_t ?? 0;
+  const pct = durationS ? Math.min(100, (t / durationS) * 100) : 0;
 
   const handleToggleFullscreen = useCallback(() => {
     const el = viewportRef.current;
@@ -223,11 +302,7 @@ function Viewport({
     onToggleFullscreen();
   }, [onToggleFullscreen]);
 
-  const scrub = (e: React.MouseEvent<HTMLDivElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
-    const f = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-    onSeek(Math.round(f * SIM_RUN_LENGTH));
-  };
+  const isFaulted = isHealthCritical(health?.health_index);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
@@ -304,8 +379,8 @@ function Viewport({
               borderRadius: 4,
             }}
           >
-            <span className="dt-pulse" style={{ width: 5, height: 5, borderRadius: "50%", background: color.danger }} />
-            {playing ? "REC · RUNNING" : "REC · PAUSED"}
+            <span className="dt-pulse" style={{ width: 5, height: 5, borderRadius: "50%", background: running ? color.danger : color.textFaint }} />
+            {running ? "REPLAY · RUNNING" : "REPLAY · STOPPED"}
           </span>
           <span
             style={{
@@ -318,7 +393,7 @@ function Viewport({
               borderRadius: 4,
             }}
           >
-            T+{hms(t)} · ×{speed}
+            T+{hms(Math.round(t))} · ×{session.speed}
           </span>
         </div>
 
@@ -366,10 +441,10 @@ function Viewport({
         </div>
 
         <div style={{ position: "absolute", bottom: 14, left: 14, right: 14, display: "flex", flexWrap: "wrap", gap: 8 }}>
-          <HudTile label="ALT" value={altLabel(params.alt)} />
-          <HudTile label="IAS" value="104 kt" />
-          <HudTile label="RPM" value={rpmLabel(params.throttle)} />
-          <HudTile label="CHT 3" value={chtLabel(params.fault, params.oat)} danger />
+          <HudTile label="ANOMALY SCORE" value={health?.anomaly_score !== null && health?.anomaly_score !== undefined ? health.anomaly_score.toFixed(4) : "—"} danger={health?.is_anomalous === true} />
+          <HudTile label="ANOMALOUS" value={health?.is_anomalous === null || health?.is_anomalous === undefined ? "—" : health.is_anomalous ? "YES" : "NO"} danger={health?.is_anomalous === true} />
+          <HudTile label="HEALTH SCORE" value={health ? `${health.health_index.toFixed(1)} / 100` : "—"} danger={isHealthCritical(health?.health_index)} />
+          <HudTile label="TIME" value={`${t.toFixed(1)} s`} />
         </div>
       </div>
 
@@ -387,138 +462,101 @@ function Viewport({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <TransportButton onClick={() => onSeek(Math.max(0, t - 30))}>◀◀</TransportButton>
-            <div
-              onClick={onTogglePlay}
-              className="dt-btn-play"
-              style={{
-                width: 40,
-                height: 32,
-                borderRadius: 7,
-                background: color.text,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                fontFamily: font.mono,
-                fontSize: 12,
-                fontWeight: 700,
-                color: color.bg,
-              }}
-            >
-              {playing ? "❚❚" : "▶"}
-            </div>
-            <TransportButton onClick={() => onSeek(Math.min(SIM_RUN_LENGTH, t + 30))}>▶▶</TransportButton>
-          </div>
-          <div style={{ display: "flex", gap: 2, padding: 3, background: color.wellBg, border: `1px solid ${color.border}`, borderRadius: 7 }}>
-            {SPEEDS.map((s) => {
-              const st = tabStyle(speed === s);
-              return (
-                <div
-                  key={s}
-                  onClick={() => onSpeedChange(s)}
-                  className="dt-tab"
-                  style={{
-                    padding: "5px 9px",
-                    borderRadius: 4,
-                    fontFamily: font.mono,
-                    fontSize: 12,
-                    cursor: "pointer",
-                    background: st.bg,
-                    color: st.fg,
-                  }}
-                >
-                  {s}×
-                </div>
-              );
-            })}
+          <div
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: running ? color.accent : color.textFaint,
+              flex: "0 0 auto",
+            }}
+            className={running ? "dt-pulse" : undefined}
+          />
+          <div style={{ fontFamily: font.mono, fontSize: 12, color: color.textLabel }}>
+            {session.selectedRunId || "no preset selected"}
           </div>
           <div style={{ flex: "1 1 auto" }} />
           <div style={{ fontFamily: font.mono, fontSize: 12, color: color.textLabel }}>
-            T+{hms(t)} / 02:15:00
+            T+{hms(Math.round(t))} / {durationS !== null ? hms(Math.round(durationS)) : "--:--:--"}
           </div>
-          <button
-            type="button"
-            onClick={handleExport}
-            className="dt-btn-ghost"
-            style={{
-              padding: "7px 13px",
-              borderRadius: 6,
-              border: exported ? `1px solid ${color.accentDim}` : "1px solid #2b3238",
-              fontSize: 12,
-              fontWeight: 600,
-              color: exported ? color.accent : color.textDim,
-              cursor: "pointer",
-              background: "transparent",
-            }}
-          >
-            {exported ? "Exported ✓" : "Export run"}
-          </button>
         </div>
 
         <div
-          onClick={scrub}
-          style={{ position: "relative", height: 40, borderRadius: 7, background: "#0d1013", border: "1px solid #1f252a", overflow: "hidden", cursor: "pointer" }}
+          style={{ position: "relative", height: 16, borderRadius: 7, background: "#0d1013", border: "1px solid #1f252a", overflow: "hidden" }}
         >
-          <svg viewBox="0 0 900 40" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" }}>
-            <polyline
-              className="dt-chart-line"
-              pathLength="1"
-              points="0,31 60,29 120,30 180,27 240,28 300,26 360,25 420,23 480,19 540,14 600,10 660,8 720,7 780,6 840,6 900,5"
-              fill="none"
-              stroke={color.accentDim}
-              strokeWidth="1.6"
-            />
-            <rect x="480" y="0" width="420" height="40" fill="rgba(255,77,61,.07)" />
-            <line x1="480" y1="0" x2="480" y2="40" stroke="#8d979f" strokeWidth="1.2" />
-            <line x1="620" y1="0" x2="620" y2="40" stroke={color.danger} strokeWidth="1.5" />
-          </svg>
+          <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: `${pct}%`, background: isFaulted ? "rgba(255,77,61,.35)" : "rgba(79,179,145,.35)" }} />
           <div style={{ position: "absolute", top: 0, bottom: 0, width: 2, background: color.text, left: `${pct}%` }} />
-          <div
-            style={{
-              position: "absolute",
-              top: -3,
-              width: 9,
-              height: 9,
-              borderRadius: "50%",
-              background: color.text,
-              border: `2px solid ${color.bg}`,
-              left: `calc(${pct}% - 4px)`,
-            }}
-          />
-          <div style={{ position: "absolute", left: 486, top: 5, fontFamily: font.mono, fontSize: 11.5, color: color.textMuted }}>
-            ONSET
-          </div>
-          <div style={{ position: "absolute", left: 626, top: 5, fontFamily: font.mono, fontSize: 11.5, color: color.dangerSoft }}>
-            MISFIRE
-          </div>
         </div>
+
+        {showAnalyticsButton && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: font.mono, fontSize: 11.5, color: isFaulted ? color.dangerSoft : color.accent }}>
+              Run complete{lastCompletedRun ? ` -- ${lastCompletedRun.finalStatus}` : ""}. Full analysis is ready.
+            </span>
+            <button
+              type="button"
+              onClick={onGoToAnalytics}
+              className="dt-btn-ghost"
+              style={{
+                padding: "8px 14px",
+                borderRadius: 6,
+                border: `1px solid ${isFaulted ? color.danger : color.accentDim}`,
+                background: "transparent",
+                color: isFaulted ? color.danger : color.accent,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              View in Analytics →
+            </button>
+          </div>
+        )}
       </div>
+
+      <RulPanel health={session.health} history={session.rulHistory} />
     </div>
   );
 }
 
-function TransportButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+function RulPanel({ health, history }: { health: ReplaySession["health"]; history: ReplaySession["rulHistory"] }) {
+  const rul = health?.rul_estimate_hours ?? null;
+  const declining = isRulDeclining(history);
+
   return (
     <div
-      onClick={onClick}
-      className="dt-btn-ghost"
       style={{
-        width: 32,
-        height: 32,
-        borderRadius: 7,
-        border: "1px solid #2b3238",
+        flex: "0 0 auto",
+        margin: "0 18px 18px 18px",
+        padding: "16px 18px",
+        borderRadius: 11,
+        background: color.panelBgAlt,
+        border: `1px solid ${color.border}`,
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        cursor: "pointer",
-        fontFamily: font.mono,
-        fontSize: 11,
-        color: color.textDim,
+        flexDirection: "column",
+        gap: 10,
       }}
     >
-      {children}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+        <span style={{ fontFamily: font.mono, fontSize: 11, color: color.textLabel2, letterSpacing: "0.13em" }}>
+          PREDICTED REMAINING USEFUL LIFE · UPDATES EVERY 1S
+        </span>
+        <span style={{ fontFamily: font.mono, fontSize: 11, color: color.textLabel }}>
+          {health ? `${health.source}${health.model_version ? ` · ${health.model_version}` : ""}` : "no session"}
+        </span>
+      </div>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+        <span style={{ fontFamily: font.mono, fontSize: 40, fontWeight: 700, lineHeight: 1, color: declining ? color.danger : color.accent }}>
+          {hoursLabel(rul)}
+        </span>
+        {health && (
+          <span style={{ fontFamily: font.mono, fontSize: 13, color: color.textLabel }}>
+            {faultTypeLabel(health.fault_type)} · health {health.health_index.toFixed(1)}/100
+          </span>
+        )}
+      </div>
+      <RulChart history={history} height={160} />
     </div>
   );
 }
@@ -547,68 +585,43 @@ function HudTile({ label, value, danger }: { label: string; value: string; dange
   );
 }
 
-const XAI_DRIVERS = [
-  { label: "EGT 3 residual", value: "+0.42", color: color.danger },
-  { label: "Injector pulse width", value: "+0.31", color: color.danger },
-  { label: "Vib 174 Hz band", value: "+0.19", color: color.text },
-  { label: "Throttle transients", value: "+0.11", color: color.text },
-  { label: "Oil temp", value: "−0.06", color: color.accent },
-];
+function TelemetryPanel({ session, xai, onXaiChange }: { session: ReplaySession; xai: XaiTab; onXaiChange: (xai: XaiTab) => void }) {
+  const { frame, health } = session;
 
-const PREDICTED_FAULTS = [
-  { title: "Cyl 3 injector coking", rul: "18.4 h", conf: "CONF 94.2% · ±2.1 h", color: color.dangerSoft, rulColor: color.danger },
-  { title: "Exhaust valve seat wear", rul: "62 h", conf: "CONF 58.0% · ±14 h", color: color.text, rulColor: color.text },
-  { title: "Alternator brush wear", rul: "210 h", conf: "CONF 22.0% · ±40 h", color: color.textDim, rulColor: color.accent },
-];
-
-function TelemetryPanel({ params, xai, onXaiChange }: { params: SimParams; xai: XaiTab; onXaiChange: (xai: XaiTab) => void }) {
   return (
     <div style={{ borderLeft: `1px solid ${color.border}`, background: color.panelBg, overflowY: "auto", display: "flex", flexDirection: "column" }}>
       <div style={{ padding: "20px 18px 18px 18px", borderBottom: `1px solid ${color.border}`, display: "flex", flexDirection: "column", gap: 10, flex: "0 0 auto" }}>
         <SectionLabel>ENVIRONMENT</SectionLabel>
-        <SyncRowLight label="OAT" value={oatLabel(params.oat)} />
-        <SyncRowLight label="DENSITY ALT" value="21 400 ft" />
-        <SyncRowLight label="MIXTURE" value={mixLabel(params.mix)} />
+        <SyncRowLight label="OAT" value={oatLabel(frame?.ambient_temperature)} />
+        <SyncRowLight label="ALTITUDE" value={frame ? `${frame.altitude.toFixed(0)} m` : "—"} />
+        <SyncRowLight label="THROTTLE" value={frame ? `${(frame.throttle * 100).toFixed(0)}%` : "—"} />
+        <SyncRowLight label="ENGINE STATE" value={frame?.engine_state ?? "—"} />
       </div>
 
       <div style={{ padding: "20px 18px 18px 18px", borderBottom: `1px solid ${color.border}`, display: "flex", flexDirection: "column", gap: 12, flex: "0 0 auto" }}>
         <SectionLabel>LIVE CHANNELS</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <ChannelTile label="RPM" value={rpmLabel(params.throttle)} />
-          <ChannelTile label="MAP" value="27.4 inHg" />
-          <ChannelTile label="OIL PRESS" value="3.9 bar" />
-          <ChannelTile label="OIL TEMP" value="96 °C" />
-          <ChannelTile label="FUEL FLOW" value="12.4 kg/h" />
-          <ChannelTile label="VIB RMS" value="2.8 g" danger />
+          <ChannelTile label="RPM" value={rpmLabel(frame?.rpm)} />
+          <ChannelTile label="MAP" value={kPaLabel(frame?.map)} />
+          <ChannelTile label="OIL PRESS" value={barLabel(frame?.oil_pressure)} danger={health?.fault_type === "lubrication_degradation"} />
+          <ChannelTile label="OIL TEMP" value={celsiusLabel(frame?.oil_temperature)} />
+          <ChannelTile label="FUEL FLOW" value={kgPerHourLabel(frame?.fuel_flow)} />
+          <ChannelTile
+            label="VIB (BEARING)"
+            value={gLabel(frame?.vibration_rms_x_bearing_proxy)}
+            danger={health?.fault_type === "mechanical_vibration"}
+          />
         </div>
       </div>
 
       <div style={{ padding: "20px 18px 18px 18px", borderBottom: `1px solid ${color.border}`, display: "flex", flexDirection: "column", gap: 12, flex: "0 0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <SectionLabel>PREDICTED FAULTS</SectionLabel>
-          <span style={{ fontFamily: font.mono, fontSize: 11, color: color.textLabel }}>RUL</span>
+          <SectionLabel>PREDICTED FAULT</SectionLabel>
+          <span style={{ fontFamily: font.mono, fontSize: 11, color: color.textLabel }}>
+            {health ? `${health.source}${health.model_version ? ` · ${health.model_version}` : ""}` : "—"}
+          </span>
         </div>
-        {PREDICTED_FAULTS.map((f) => (
-          <div
-            key={f.title}
-            className="dt-glow-card"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 5,
-              padding: "12px 14px",
-              border: `1px solid ${color.border}`,
-              background: color.panelBgAlt,
-              ...glowVars(f.rulColor === color.danger),
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: f.color }}>{f.title}</span>
-              <span style={{ fontFamily: font.mono, fontSize: 12.5, fontWeight: 600, color: f.rulColor }}>{f.rul}</span>
-            </div>
-            <div style={{ fontFamily: font.mono, fontSize: 11, color: color.textLabel }}>{f.conf}</div>
-          </div>
-        ))}
+        <PredictedFaultCard health={health} />
       </div>
 
       <div style={{ padding: "20px 18px 28px 18px", display: "flex", flexDirection: "column", gap: 12, flex: "0 0 auto" }}>
@@ -639,9 +652,60 @@ function TelemetryPanel({ params, xai, onXaiChange }: { params: SimParams; xai: 
           })}
         </div>
 
-        {xai === "drivers" && <XaiDrivers />}
-        {xai === "residual" && <XaiResidual />}
-        {xai === "reasoning" && <XaiReasoning />}
+        {xai === "drivers" && <XaiSignals health={health} />}
+        {xai === "reasoning" && <XaiSummary health={health} />}
+      </div>
+    </div>
+  );
+}
+
+function PredictedFaultCard({ health }: { health: ReplaySession["health"] }) {
+  if (!health) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 5,
+          padding: "12px 14px",
+          border: `1px solid ${color.border}`,
+          background: color.panelBgAlt,
+        }}
+      >
+        <span style={{ fontSize: 12.5, color: color.textFaint }}>No session running</span>
+      </div>
+    );
+  }
+
+  // Predicted Fault is a name, not a score -- any fault_type other than
+  // "none" (healthy) is red here, regardless of health_index/RUL.
+  const isHealthy = health.fault_type === "none";
+  const rulColor = health.rul_estimate_hours !== null && health.rul_estimate_hours < 24 ? color.danger : color.text;
+
+  return (
+    <div
+      className="dt-glow-card"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 5,
+        padding: "12px 14px",
+        border: `1px solid ${color.border}`,
+        background: color.panelBgAlt,
+        ...glowVars(!isHealthy),
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10 }}>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: isHealthy ? color.accent : color.dangerSoft }}>
+          {faultTypeLabel(health.fault_type)}
+        </span>
+        <span style={{ fontFamily: font.mono, fontSize: 12.5, fontWeight: 600, color: rulColor }}>
+          {hoursLabel(health.rul_estimate_hours)}
+        </span>
+      </div>
+      <div style={{ fontFamily: font.mono, fontSize: 11, color: color.textLabel }}>
+        HEALTH {health.health_index.toFixed(1)} / 100 · CONF {(health.fault_probability * 100).toFixed(1)}%
+        {health.forecast_horizon_s > 0 ? ` · +${health.forecast_horizon_s}s FORECAST` : ""}
       </div>
     </div>
   );
@@ -680,92 +744,116 @@ function ChannelTile({ label, value, danger }: { label: string; value: string; d
   );
 }
 
-function XaiDrivers() {
+function XaiSignals({ health }: { health: ReplaySession["health"] }) {
+  if (!health) {
+    return <div style={{ fontSize: 12, color: color.textFaint }}>No session running.</div>;
+  }
+
+  const rows = [
+    {
+      label: "Sensor fault: CHT C3",
+      value: health.sensor_fault_cht_c3 ?? "—",
+      flagged: health.sensor_fault_cht_c3 !== null && health.sensor_fault_cht_c3 !== "NONE",
+    },
+    {
+      label: "Sensor fault: bearing vibration",
+      value: health.sensor_fault_bearing_vibration ?? "—",
+      flagged: health.sensor_fault_bearing_vibration !== null && health.sensor_fault_bearing_vibration !== "NONE",
+    },
+    {
+      label: "Anomaly score (autoencoder)",
+      value: health.anomaly_score !== null ? health.anomaly_score.toFixed(4) : "—",
+      flagged: health.is_anomalous === true,
+    },
+  ];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-      {XAI_DRIVERS.map((d, i) => (
+      {rows.map((r, i) => (
         <div
-          key={d.label}
+          key={r.label}
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 42px",
+            gridTemplateColumns: "1fr 70px",
             gap: 8,
             alignItems: "center",
             fontSize: 12,
             color: color.textDim,
             padding: "7px 0",
-            borderBottom: i < XAI_DRIVERS.length - 1 ? `1px solid ${color.borderSoft}` : undefined,
+            borderBottom: i < rows.length - 1 ? `1px solid ${color.borderSoft}` : undefined,
           }}
         >
-          <span>{d.label}</span>
-          <span style={{ fontFamily: font.mono, textAlign: "right", color: d.color }}>{d.value}</span>
+          <span>{r.label}</span>
+          <span style={{ fontFamily: font.mono, textAlign: "right", color: r.flagged ? color.danger : color.text }}>{r.value}</span>
         </div>
       ))}
-      <div style={{ fontFamily: font.mono, fontSize: 10.5, color: color.textLabel3 }}>SHAP ATTRIBUTION · 120 s WINDOW</div>
-    </div>
-  );
-}
-
-function XaiResidual() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ position: "relative", width: "100%" }}>
-        <svg viewBox="0 0 300 128" preserveAspectRatio="none" style={{ width: "100%", height: 128, display: "block" }}>
-          <line x1="0" y1="88" x2="300" y2="88" stroke={color.accentDim} strokeWidth="1" />
-          <rect x="0" y="80" width="300" height="16" fill="rgba(79,179,145,.12)" />
-          <line x1="0" y1="58" x2="300" y2="58" stroke={color.danger} strokeOpacity=".35" strokeDasharray="4 4" strokeWidth="1" />
-          <polyline
-            className="dt-chart-line"
-            pathLength="1"
-            points="0,86 25,89 50,85 75,90 100,84 125,87 150,80 175,72 200,62 225,50 250,38 275,28 300,22"
-            fill="none"
-            stroke={color.danger}
-            strokeWidth="2"
-          />
-        </svg>
-        <span
-          style={{
-            position: "absolute",
-            left: 4,
-            top: 40,
-            fontFamily: font.mono,
-            fontSize: 10.5,
-            color: color.dangerSoft,
-            whiteSpace: "nowrap",
-            pointerEvents: "none",
-          }}
-        >
-          3σ ENVELOPE
-        </span>
-      </div>
-      <div style={{ fontSize: 12, color: color.textMuted, lineHeight: 1.55 }}>
-        Twin predicts 704 °C, engine reports 838 °C. Residual leaves the noise band at T+01:38 and grows
-        monotonically, a physics mismatch rather than measurement noise.
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: 10.5, color: color.textLabel3 }}>
-        <span>HYBRID THERMO + GRU</span>
-        <span>R² 0.981</span>
+      <div style={{ fontFamily: font.mono, fontSize: 10.5, color: color.textLabel3 }}>
+        xgboost_classifier ({health.sensor_fault_model_version ?? "—"}) + autoencoder ({health.anomaly_model_version ?? "—"})
       </div>
     </div>
   );
 }
 
-function XaiReasoning() {
+function XaiSummary({ health }: { health: ReplaySession["health"] }) {
+  if (!health) {
+    return <div style={{ fontSize: 12, color: color.textFaint }}>No session running.</div>;
+  }
+
+  const faulted = health.fault_type !== "none" && health.fault_type !== "unknown";
+  const sensorFlags: string[] = [];
+  if (health.sensor_fault_cht_c3 && health.sensor_fault_cht_c3 !== "NONE") sensorFlags.push(`CHT C3 sensor fault (${health.sensor_fault_cht_c3})`);
+  if (health.sensor_fault_bearing_vibration && health.sensor_fault_bearing_vibration !== "NONE") {
+    sensorFlags.push(`bearing-vibration sensor fault (${health.sensor_fault_bearing_vibration})`);
+  }
+
+  const summary = faulted
+    ? `${faultTypeLabel(health.fault_type)} detected with ${(health.fault_probability * 100).toFixed(0)}% confidence. Health index at ${health.health_index.toFixed(1)}/100${
+        health.rul_estimate_hours !== null ? `, estimated remaining useful life ${hoursLabel(health.rul_estimate_hours)}` : ""
+      }.`
+    : `No physical fault detected -- health index ${health.health_index.toFixed(1)}/100.`;
+
+  const sensorNote =
+    sensorFlags.length > 0
+      ? ` Independently, xgboost_classifier flags ${sensorFlags.join(" and ")} -- ${
+          faulted ? "reported separately from the physical fault above, not merged into it." : "a sensor issue, not a physical engine fault."
+        }`
+      : "";
+
+  const anomalyNote =
+    health.is_anomalous === true
+      ? ` The autoencoder also flags this frame as anomalous (reconstruction error ${health.anomaly_score?.toFixed(4) ?? "—"}).`
+      : "";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ fontSize: 12.5, color: color.textDim, lineHeight: 1.62, textWrap: "pretty" }}>
-        Cylinder 3 shows a widening gap between commanded and delivered fuel while every upstream channel stays
-        nominal. With the 174 Hz sideband and a rising EGT the thermodynamic model cannot reproduce, the evidence
-        points to restricted spray from a coked injector rather than ignition or sensor failure.
+        {summary}
+        {sensorNote}
+        {anomalyNote}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6, borderTop: `1px solid ${color.borderSoft}`, paddingTop: 12 }}>
         <span style={{ fontFamily: font.mono, fontSize: 10.5, color: color.textLabel3, letterSpacing: "0.1em" }}>
-          MAINTENANCE ADVISORY
+          SOURCE
         </span>
         <span style={{ fontSize: 12.5, color: color.text, lineHeight: 1.55 }}>
-          Ultrasonic clean or replace cyl 3 injector within 18 h TSN. Borescope the exhaust valve at the same visit.
+          {health.source === "model"
+            ? `lstm_rul (${health.model_version ?? "unknown version"}) once the session's rolling window filled.`
+            : "Ground-truth stand-in -- the session's rolling window hasn't filled yet, or no model artifact is loaded."}
         </span>
       </div>
     </div>
   );
 }
+
+const sessionButtonStyle: React.CSSProperties = {
+  fontFamily: font.mono,
+  fontSize: 12,
+  fontWeight: 600,
+  padding: "9px 12px",
+  borderRadius: 6,
+  border: `1px solid ${color.border}`,
+  background: color.tabOnBg,
+  color: color.text,
+  cursor: "pointer",
+  width: "100%",
+};

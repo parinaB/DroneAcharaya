@@ -1,0 +1,25 @@
+{
+  "run_id": "PRESET-healthy-hotday",
+  "n_rows": 121,
+  "duration_s": 120.0,
+  "export_rate_hz": 1,
+  "engine_id": "PRESET-healthy-hotday",
+  "mission_id": "high_throttle_climb_heavy-preset-hotday",
+  "mission_shape": "high_throttle_climb_heavy",
+  "fault_class": "healthy",
+  "split": "train",
+  "accumulated_hours_at_start": null,
+  "note": "SYNTHETIC/COMPOSITED, not raw sim output. Base: real healthy run UNIT-healthy-0001_M002 (mission_shape=high_throttle_climb_heavy, highest-throttle healthy mission available), rows 62-182 (renumbered t=0..120, mid-CLIMB start). Hot-ambient overlay: no healthy run in data/raw/ has mission_shape=hot_day_ground_ops, so the ambient_temperature level was taken from a real hot_day_ground_ops mission flown by a DIFFERENT (fault-class) unit (UNIT-injectordegradation-0007_M001) purely as a donor curve for the ambient temperature magnitude -- no other column from the donor run was used. Applied as a constant additive offset delta=+35.92C to ambient_temperature; ambient_pressure/altitude left untouched. air_density recomputed from the ideal gas law using the new ambient_temperature. intake_temperature shifted by the full delta. coolant_temperature, oil_temperature, and all cht_c*/egt_c* channels shifted by HALF the delta (+17.96C) as a simple plausibility approximation for thermal-mass/cooling buffering -- not a physics simulation, a compositing choice for demo purposes. Groundtruth _true columns received the identical offsets (no sensor fault injected in this preset, so telemetry==groundtruth still holds throughout). map/power identities recomputed defensively (unaffected by temperature changes). [Window starts mid-CLIMB (not at engine start-up) so altitude/engine_state/throttle vary from t=0 instead of sitting at IDLE/altitude=0 for the first ~60-90s of the original mission.]",
+  "source_runs": [
+    "UNIT-healthy-0001_M002"
+  ],
+  "donor_runs_ambient_curve_only": [
+    "UNIT-injectordegradation-0007_M001"
+  ],
+  "synthetic_composition": {
+    "method": "constant additive ambient_temperature offset + partial thermal propagation",
+    "delta_ambient_c": 35.9215893384672,
+    "intake_temperature_fraction": 1.0,
+    "thermal_mass_fraction_coolant_oil_cht_egt": 0.5
+  }
+}

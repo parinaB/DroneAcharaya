@@ -65,6 +65,7 @@ def write_health_score(
     anomaly_score: float | None = None,
     is_anomalous: bool | None = None,
     anomaly_model_version: str | None = None,
+    health_parameters: dict[str, float] | None = None,
 ) -> HealthScore:
     row = HealthScore(
         run_id=run_id,
@@ -86,6 +87,7 @@ def write_health_score(
         anomaly_score=anomaly_score,
         is_anomalous=is_anomalous,
         anomaly_model_version=anomaly_model_version,
+        health_parameters=health_parameters,
     )
     db.add(row)
     db.commit()

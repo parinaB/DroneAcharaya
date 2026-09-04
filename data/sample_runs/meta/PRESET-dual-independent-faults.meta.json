@@ -1,0 +1,32 @@
+{
+  "run_id": "PRESET-dual-independent-faults",
+  "n_rows": 121,
+  "duration_s": 120.0,
+  "export_rate_hz": 1,
+  "engine_id": "PRESET-dual-independent-faults",
+  "mission_id": "long_loiter-preset-dualfault",
+  "mission_shape": "long_loiter",
+  "fault_class": "cooling_degradation",
+  "concurrent_fault_class": "alternator_degradation",
+  "split": "train",
+  "accumulated_hours_at_start": null,
+  "note": "COMPOSED demo device combining two real, independent single-fault missions on non-overlapping channel groups. Base: real coolingdegradation run UNIT-coolingdegradation-0037_M006 (cooling_health=0.5), rows 90-210 (renumbered t=0..120, mid-CLIMB) -- kept fully intact for every thermal channel (cht_c1-4, coolant_temperature, oil_temperature) in both telemetry and groundtruth. Overlay: the electrical columns ONLY (alternator_power, battery_voltage, battery_current -- telemetry AND groundtruth _true counterparts) were overwritten row-for-row (aligned by t, both windows starting at row 90 of their respective source missions) with the corresponding columns from a real alternatordegradation run (UNIT-alternatordegradation-0103_M003, alternator_health=0.5). map/power identities are unaffected since electrical columns don't participate in either identity. [Window starts mid-CLIMB (not at engine start-up) so altitude/engine_state/throttle vary from t=0 instead of sitting at IDLE/altitude=0 for the first ~60-90s of the original mission.]",
+  "source_runs": [
+    "UNIT-coolingdegradation-0037_M006",
+    "UNIT-alternatordegradation-0103_M003"
+  ],
+  "overlay": {
+    "base_run": "UNIT-coolingdegradation-0037_M006",
+    "overlay_run": "UNIT-alternatordegradation-0103_M003",
+    "overlay_channels_telemetry": [
+      "alternator_power",
+      "battery_voltage",
+      "battery_current"
+    ],
+    "overlay_channels_groundtruth": [
+      "alternator_power_true",
+      "battery_voltage_true",
+      "battery_current_true"
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "run_id": "UNIT-misfire-0064_M001",
+  "engine_id": "UNIT-misfire-0064",
+  "mission_id": "hot_day_ground_ops-M001",
+  "mission_shape": "hot_day_ground_ops",
+  "fault_class": "misfire",
+  "split": "train",
+  "accumulated_hours_at_start": null,
+  "n_rows": 300,
+  "duration_s": 299.0,
+  "export_rate_hz": 1,
+  "note": "Trimmed fixture extracted from data/raw/telemetry_train.csv + groundtruth_train.csv for local demo/testing."
+}

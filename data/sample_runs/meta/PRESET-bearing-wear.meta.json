@@ -1,0 +1,16 @@
+{
+  "run_id": "PRESET-bearing-wear",
+  "n_rows": 121,
+  "duration_s": 120.0,
+  "export_rate_hz": 1,
+  "engine_id": "PRESET-bearing-wear",
+  "mission_id": "high_altitude_transit-preset",
+  "mission_shape": "high_altitude_transit",
+  "fault_class": "mechanical_vibration",
+  "split": "train",
+  "accumulated_hours_at_start": null,
+  "note": "Extracted from real mechanicalvibration run UNIT-mechanicalvibration-0063_M006, rows 60-180 (renumbered t=0..120). bearing_health=0.5, exactly at the failure_criterion threshold (<=0.5). Visible via vibration_rms_x_bearing_proxy/vibration_order_1x_bearing_proxy rising as throttle/RPM increase. No modification beyond trimming/renumbering t. [Window starts mid-CLIMB (not at engine start-up) so altitude/engine_state/throttle vary from t=0 instead of sitting at IDLE/altitude=0 for the first ~60-90s of the original mission.]",
+  "source_runs": [
+    "UNIT-mechanicalvibration-0063_M006"
+  ]
+}

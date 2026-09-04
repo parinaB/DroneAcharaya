@@ -1,0 +1,23 @@
+{
+  "run_id": "PRESET-egt-sensor-drift",
+  "n_rows": 121,
+  "duration_s": 120.0,
+  "export_rate_hz": 1,
+  "engine_id": "PRESET-egt-sensor-drift",
+  "mission_id": "short_patrol-preset-sensorfault",
+  "mission_shape": "short_patrol",
+  "fault_class": "healthy",
+  "split": "train",
+  "accumulated_hours_at_start": null,
+  "note": "Base: real healthy run UNIT-healthy-0002_M001, rows 60-180 (renumbered t=0..120) -- engine is PHYSICALLY healthy throughout. SYNTHETIC sensor fault injected on telemetry egt_c1 ONLY: a slow monotonic linear ramp from +0C to +120C added over the mission, applied to telemetry egt_c1 but deliberately NOT to groundtruth egt_c1_true. Siblings egt_c2/c3/c4 are completely untouched in both telemetry and groundtruth -- that sibling consistency is the whole discriminator this preset demonstrates. [Window starts mid-CLIMB (not at engine start-up) so altitude/engine_state/throttle vary from t=0 instead of sitting at IDLE/altitude=0 for the first ~60-90s of the original mission.]",
+  "source_runs": [
+    "UNIT-healthy-0002_M001"
+  ],
+  "synthetic_composition": {
+    "method": "linear ramp added to telemetry egt_c1 only",
+    "ramp_start_c": 0.0,
+    "ramp_end_c": 120.0,
+    "channel": "egt_c1",
+    "groundtruth_unmodified": true
+  }
+}

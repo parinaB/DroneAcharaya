@@ -209,7 +209,8 @@ def get_health_score(
             x = build_lstm_input(lstm_bundle, lstm_window)
             health_pred, rul_pred, _sensor_fault_logits, _attn = lstm_bundle.model(x)
 
-        fault_type, fault_probability, health_index = model_health_score(health_pred[0].tolist())
+        health_pred_values = health_pred[0].tolist()
+        fault_type, fault_probability, health_index = model_health_score(health_pred_values)
         rul_seconds = float(rul_pred.item()) * lstm_bundle.rul_scale_seconds
         result = {
             "fault_type": fault_type,
@@ -221,6 +222,7 @@ def get_health_score(
             "source": "model",
             "model_version": f"lstm_rul/{lstm_bundle.version}",
             "forecast_horizon_s": LSTM_FORECAST_HORIZON_S,
+            "health_parameters": dict(zip(LSTM_HEALTH_PARAM_ORDER, health_pred_values, strict=True)),
         }
     elif groundtruth_row is None:
         # No ground truth available (e.g. a live/non-fixture source) and no
@@ -235,9 +237,12 @@ def get_health_score(
             "source": "ground_truth",
             "model_version": None,
             "forecast_horizon_s": 0.0,
+            "health_parameters": None,
         }
     else:
         health_index, fault_probability = ground_truth_health_score(fault_class, groundtruth_row)
+        spec = HEALTH_COLUMNS.get(fault_class) if fault_class not in (None, "healthy", "none") else None
+        health_parameters = {col: groundtruth_row[col] for col in spec[1] if col in groundtruth_row} if spec else None
         result = {
             "fault_type": fault_class or "none",
             "fault_probability": fault_probability,
@@ -251,6 +256,11 @@ def get_health_score(
             "source": "ground_truth",
             "model_version": None,
             "forecast_horizon_s": 0.0,
+            # Only the 1-4 columns HEALTH_COLUMNS reads for this fault_class
+            # -- never all 16, since this path never reads the rest. None
+            # when fault_class is healthy/unrecognized, matching
+            # ground_truth_health_score's own "don't fabricate" convention.
+            "health_parameters": health_parameters or None,
         }
 
     if xgb_bundle is not None and xgb_window is not None:

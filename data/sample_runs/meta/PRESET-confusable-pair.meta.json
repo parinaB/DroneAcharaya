@@ -1,0 +1,23 @@
+{
+  "run_id": "PRESET-confusable-pair",
+  "n_rows": 121,
+  "duration_s": 120.0,
+  "export_rate_hz": 1,
+  "engine_id": "PRESET-confusable-pair",
+  "mission_id": "long_loiter-preset-confusable",
+  "mission_shape": "long_loiter",
+  "fault_class": "injector_degradation",
+  "split": "train",
+  "accumulated_hours_at_start": null,
+  "note": "Base: real injectordegradation run UNIT-injectordegradation-0009_M006, rows 90-210 (renumbered t=0..120). The real injector fault is left FULLY INTACT and unmodified -- injector_health_c1=0.4 in groundtruth, egt_c1 running cool vs siblings in telemetry, exactly as in the source data. ADDITIONALLY, a synthetic sensor drift ramp was injected on telemetry battery_voltage ONLY: linear ramp from +0V to -3V added over the mission. groundtruth battery_voltage_true stays clean/unmodified. battery_current and alternator_power are untouched. fault_class reflects the real physical fault (injector_degradation); the sensor-fault injection is documented here. [Window starts mid-CLIMB (not at engine start-up) so altitude/engine_state/throttle vary from t=0 instead of sitting at IDLE/altitude=0 for the first ~60-90s of the original mission.]",
+  "source_runs": [
+    "UNIT-injectordegradation-0009_M006"
+  ],
+  "synthetic_composition": {
+    "method": "linear ramp added to telemetry battery_voltage only",
+    "ramp_start_v": 0.0,
+    "ramp_end_v": -3.0,
+    "channel": "battery_voltage",
+    "groundtruth_unmodified": true
+  }
+}

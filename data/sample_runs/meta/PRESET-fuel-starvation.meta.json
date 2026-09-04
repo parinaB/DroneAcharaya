@@ -1,0 +1,16 @@
+{
+  "run_id": "PRESET-fuel-starvation",
+  "n_rows": 121,
+  "duration_s": 120.0,
+  "export_rate_hz": 1,
+  "engine_id": "PRESET-fuel-starvation",
+  "mission_id": "long_loiter-preset-highload",
+  "mission_shape": "long_loiter",
+  "fault_class": "fuel_starvation",
+  "split": "train",
+  "accumulated_hours_at_start": null,
+  "note": "Trimmed fixture extracted as-is from real fuelstarvation run UNIT-fuelstarvation-0095_M006, rows 300-420 of the original mission (renumbered t=0..120) -- deliberately NOT the mission start, chosen because throttle ramps up through this window to a peak of ~0.91 (CLIMB into CRUISE), the high-load condition failure-mode-matrix.csv documents as necessary for fuel_starvation's condition-gated signature to be visible at all. fuel_delivery_health=0.4 for the whole mission, past the <=0.6 failure criterion. No modification beyond trimming/renumbering t.",
+  "source_runs": [
+    "UNIT-fuelstarvation-0095_M006"
+  ]
+}

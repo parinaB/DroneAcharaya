@@ -44,3 +44,12 @@ class HealthScoreOut(BaseModel):
     anomaly_score: float | None = None
     is_anomalous: bool | None = None
     anomaly_model_version: str | None = None
+    # Per-health-parameter values feeding app/maintenance/rule_engine.py --
+    # the same 16 names as contract/health-parameter-registry.md, all in its
+    # 1.0=healthy->0.0=failed convention. On the model path this is the
+    # lstm_rul health head's full 16-value output (health_index above is
+    # just its worst entry); on the ground-truth stand-in path this only
+    # contains the 1-4 columns HEALTH_COLUMNS reads for the run's known
+    # fault_class -- never fabricated for parameters that path doesn't read.
+    # None when neither path has any values (e.g. no ground truth, no model).
+    health_parameters: dict[str, float] | None = None

@@ -1,28 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { color, font } from "../_lib/tokens";
+import { color } from "../_lib/tokens";
 import type { Screen } from "../_lib/state";
-import {
-  DashboardIcon,
-  FaultIcon,
-  HealthIcon,
-  ReportsIcon,
-  SensorsIcon,
-  SettingsIcon,
-  SimulationIcon,
-} from "./NavIcons";
+import { DashboardIcon, SimulationIcon } from "./NavIcons";
 
 const EXPANDED_WIDTH = 232;
 const COLLAPSED_WIDTH = 68;
-
-const INERT_NAV_ITEMS: { label: string; icon: React.ReactNode }[] = [
-  { label: "Health & Diagnostics", icon: <HealthIcon /> },
-  { label: "Fault Predictions", icon: <FaultIcon /> },
-  { label: "Reports", icon: <ReportsIcon /> },
-  { label: "Sensors & Data Sources", icon: <SensorsIcon /> },
-  { label: "Settings", icon: <SettingsIcon /> },
-];
 
 export function Sidebar({
   screen,
@@ -135,7 +119,7 @@ export function Sidebar({
         </div>
         {!collapsed && (
           <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.08em", whiteSpace: "nowrap" }}>
-            DRONE-ACHARYA
+            DRONEACHARAYA
           </div>
         )}
       </div>
@@ -152,46 +136,20 @@ export function Sidebar({
         }}
       >
         <NavItem
-          icon={<DashboardIcon />}
-          label="Live Dashboard"
-          active={!isSim}
-          collapsed={collapsed}
-          onClick={() => onScreenChange("dashboard")}
-        />
-        <NavItem
           icon={<SimulationIcon />}
           label="Simulation / Digital Twin"
           active={isSim}
           collapsed={collapsed}
           onClick={() => onScreenChange("simulation")}
         />
-
-        <div style={{ height: 1, background: color.border, margin: collapsed ? "12px 6px" : "14px 12px" }} />
-
-        {INERT_NAV_ITEMS.map(({ label, icon }) => (
-          <InertNavItem key={label} label={label} icon={icon} collapsed={collapsed} badge={label === "Fault Predictions" ? "1" : undefined} />
-        ))}
+        <NavItem
+          icon={<DashboardIcon />}
+          label="Analytics"
+          active={!isSim}
+          collapsed={collapsed}
+          onClick={() => onScreenChange("dashboard")}
+        />
       </nav>
-
-      <div
-        style={{
-          padding: collapsed ? "14px 8px 18px 8px" : "14px 20px 18px 20px",
-          borderTop: `1px solid ${color.border}`,
-          display: "flex",
-          flexDirection: "column",
-          gap: 9,
-          alignItems: collapsed ? "center" : "stretch",
-        }}
-      >
-        {collapsed ? (
-          <span className="dt-pulse" style={{ width: 6, height: 6, borderRadius: "50%", background: color.accent }} title="Telemetry live" />
-        ) : (
-          <>
-            <TelemetryRow label="TELEMETRY" value="LIVE · 42 ms" />
-            <TelemetryRow label="INFERENCE" value="ON-BOARD" />
-          </>
-        )}
-      </div>
       </div>
     </aside>
   );
@@ -248,87 +206,3 @@ function NavItem({
   );
 }
 
-function InertNavItem({
-  label,
-  icon,
-  collapsed,
-  badge,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  collapsed: boolean;
-  badge?: string;
-}) {
-  return (
-    <div
-      className="dt-nav-item"
-      title={collapsed ? label : undefined}
-      style={{
-        position: "relative",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: collapsed ? "center" : "space-between",
-        padding: collapsed ? "10px 0" : "10px 12px",
-        borderRadius: 7,
-        cursor: "pointer",
-        fontSize: 13.5,
-        fontWeight: 500,
-        whiteSpace: "nowrap",
-        color: color.textInactive,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-        {!collapsed && <span style={{ width: 3, height: 14, flex: "0 0 3px" }} />}
-        <span style={{ display: "flex", flex: "0 0 auto" }}>{icon}</span>
-        {!collapsed && <span>{label}</span>}
-      </div>
-      {badge && !collapsed && (
-        <span
-          style={{
-            fontFamily: font.mono,
-            fontSize: 11.5,
-            fontWeight: 600,
-            color: color.bg,
-            background: color.danger,
-            borderRadius: 20,
-            padding: "2px 6px",
-          }}
-        >
-          {badge}
-        </span>
-      )}
-      {badge && collapsed && (
-        <span
-          style={{
-            position: "absolute",
-            top: 4,
-            right: 12,
-            width: 7,
-            height: 7,
-            borderRadius: "50%",
-            background: color.danger,
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-function TelemetryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        fontFamily: font.mono,
-        fontSize: 11.5,
-        color: color.textLabel2,
-        whiteSpace: "nowrap",
-      }}
-    >
-      <span>{label}</span>
-      <span style={{ color: color.accent }}>{value}</span>
-    </div>
-  );
-}

@@ -149,4 +149,43 @@ export interface HealthScoreOut {
   anomaly_score: number | null;
   is_anomalous: boolean | null;
   anomaly_model_version: string | null;
+  /** Per-health-parameter values feeding /advisory/latest's rule engine --
+   * contract/health-parameter-registry.md's 16 canonical names, all in its
+   * 1.0=healthy->0.0=failed convention. On the model path this is
+   * lstm_rul's full 16-value health head output; on the ground-truth
+   * stand-in path only the 1-4 columns relevant to this run's fault_class
+   * are present. null when neither path has any values. */
+  health_parameters: Record<string, number> | null;
+}
+
+/** contract/maintenance-rules.yaml's tier/urgency vocabulary --
+ * backend/app/maintenance/rule_engine.py is the only thing that assigns
+ * these, never computed client-side. */
+export type MaintenanceTier = "watch" | "warning" | "critical";
+export type MaintenanceUrgency = "IMMEDIATE" | "URGENT" | "SCHEDULED" | "ROUTINE";
+
+export interface MaintenanceRecommendation {
+  component: string;
+  health_parameter: string;
+  value: number;
+  tier: MaintenanceTier;
+  urgency: MaintenanceUrgency;
+  action: string;
+  consequence: string;
+  severity_rank: number;
+}
+
+export interface SensorFaultRecommendation {
+  channel: string;
+  fault_type: string;
+  action: string;
+}
+
+/** GET /advisory/latest's response shape -- backend/app/maintenance/schemas.py's
+ * MaintenanceReport. Both lists are already sorted by the backend (urgency
+ * then severity_rank for engine_recommendations); render in the order given,
+ * don't re-sort client-side. */
+export interface MaintenanceReport {
+  engine_recommendations: MaintenanceRecommendation[];
+  sensor_recommendations: SensorFaultRecommendation[];
 }

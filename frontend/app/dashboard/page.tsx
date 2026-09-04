@@ -4,45 +4,25 @@ import { useEffect, useState } from "react";
 import { Sidebar } from "./_components/Sidebar";
 import { TopBar } from "./_components/TopBar";
 import { LiveDashboard } from "./_components/LiveDashboard";
-import { LiveModelPanel } from "./_components/LiveModelPanel";
 import { SimulationView } from "./_components/SimulationView";
 import { LoadingScreen } from "./_components/LoadingScreen";
 import { color } from "./_lib/tokens";
-import {
-  DEFAULT_SIM_PARAMS,
-  SIM_RUN_LENGTH,
-  THEME_STORAGE_KEY,
-  type Camera,
-  type Screen,
-  type SimParams,
-  type Theme,
-  type XaiTab,
-} from "./_lib/state";
+import { useReplaySession } from "./_lib/useReplaySession";
+import { THEME_STORAGE_KEY, type Camera, type Screen, type Theme, type XaiTab } from "./_lib/state";
 
 export default function DashboardPage() {
   const [booting, setBooting] = useState(true);
   const [theme, setTheme] = useState<Theme>("dark");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const [screen, setScreen] = useState<Screen>("dashboard");
+  const [screen, setScreen] = useState<Screen>("simulation");
   const [acknowledged, setAcknowledged] = useState(false);
 
-  const [playing, setPlaying] = useState(true);
-  const [speed, setSpeed] = useState(2);
-  const [t, setT] = useState(5306);
-  const [scenario, setScenario] = useState(1);
   const [camera, setCamera] = useState<Camera>("eng");
   const [xai, setXai] = useState<XaiTab>("drivers");
   const [fullscreen, setFullscreen] = useState(false);
-  const [params] = useState<SimParams>(DEFAULT_SIM_PARAMS);
 
-  useEffect(() => {
-    if (!playing) return;
-    const id = setInterval(() => {
-      setT((prev) => (prev + speed) % SIM_RUN_LENGTH);
-    }, 1000);
-    return () => clearInterval(id);
-  }, [playing, speed]);
+  const session = useReplaySession();
 
   useEffect(() => {
     try {
@@ -63,17 +43,6 @@ export default function DashboardPage() {
       }
       return next;
     });
-  };
-
-  const openPrediction = () => {
-    setScreen("simulation");
-    setScenario(1);
-    setXai("drivers");
-  };
-  const whyThisPrediction = () => {
-    setScreen("simulation");
-    setScenario(1);
-    setXai("reasoning");
   };
 
   return (
@@ -116,34 +85,22 @@ export default function DashboardPage() {
           <div key={screen} className="dt-screen-enter" style={{ flex: "1 1 auto", display: "flex", minHeight: 0 }}>
             {booting ? null : screen === "dashboard" ? (
               <div style={{ flex: "1 1 auto", display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, overflow: "hidden" }}>
-                <LiveModelPanel />
                 <LiveDashboard
+                  lastCompletedRun={session.lastCompletedRun}
                   acknowledged={acknowledged}
                   onAcknowledge={() => setAcknowledged((a) => !a)}
-                  onOpenPrediction={openPrediction}
-                  onWhyThisPrediction={whyThisPrediction}
                 />
               </div>
             ) : (
               <SimulationView
-                scenario={scenario}
-                onScenarioChange={setScenario}
-                params={params}
-                playing={playing}
-                onTogglePlay={() => setPlaying((p) => !p)}
-                speed={speed}
-                onSpeedChange={setSpeed}
-                t={t}
-                onSeek={(next) => {
-                  setPlaying(false);
-                  setT(next);
-                }}
+                session={session}
                 camera={camera}
                 onCameraChange={setCamera}
                 xai={xai}
                 onXaiChange={setXai}
                 fullscreen={fullscreen}
                 onToggleFullscreen={() => setFullscreen((f) => !f)}
+                onGoToAnalytics={() => setScreen("dashboard")}
               />
             )}
           </div>

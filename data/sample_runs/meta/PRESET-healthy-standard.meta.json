@@ -1,0 +1,16 @@
+{
+  "run_id": "PRESET-healthy-standard",
+  "n_rows": 121,
+  "duration_s": 120.0,
+  "export_rate_hz": 1,
+  "engine_id": "PRESET-healthy-standard",
+  "mission_id": "short_patrol-preset",
+  "mission_shape": "short_patrol",
+  "fault_class": "healthy",
+  "split": "train",
+  "accumulated_hours_at_start": null,
+  "note": "Extracted from real healthy run UNIT-healthy-0002_M001 (mission_shape=short_patrol) in data/raw/telemetry_train.csv + groundtruth_train.csv, rows 60-180 (renumbered t=0..120). No modification beyond trimming/renumbering t. [Window starts mid-CLIMB (not at engine start-up) so altitude/engine_state/throttle vary from t=0 instead of sitting at IDLE/altitude=0 for the first ~60-90s of the original mission.]",
+  "source_runs": [
+    "UNIT-healthy-0002_M001"
+  ]
+}

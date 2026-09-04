@@ -162,6 +162,9 @@ class HealthScore(Base):
     anomaly_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     is_anomalous: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     anomaly_model_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Per-health-parameter values feeding app/maintenance/rule_engine.py --
+    # see HealthScoreOut's own docstring for shape/convention/coverage.
+    health_parameters: Mapped[dict[str, float] | None] = mapped_column(JSON, nullable=True)
 
 
 class AdvisoryState(Base):
