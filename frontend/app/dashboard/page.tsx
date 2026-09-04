@@ -8,7 +8,7 @@ import { SimulationView } from "./_components/SimulationView";
 import { LoadingScreen } from "./_components/LoadingScreen";
 import { color } from "./_lib/tokens";
 import { useReplaySession } from "./_lib/useReplaySession";
-import { THEME_STORAGE_KEY, type Camera, type Screen, type Theme, type XaiTab } from "./_lib/state";
+import { THEME_STORAGE_KEY, type Screen, type Theme, type XaiTab } from "./_lib/state";
 
 export default function DashboardPage() {
   const [booting, setBooting] = useState(true);
@@ -18,7 +18,6 @@ export default function DashboardPage() {
   const [screen, setScreen] = useState<Screen>("simulation");
   const [acknowledged, setAcknowledged] = useState(false);
 
-  const [camera, setCamera] = useState<Camera>("eng");
   const [xai, setXai] = useState<XaiTab>("drivers");
   const [fullscreen, setFullscreen] = useState(false);
 
@@ -94,8 +93,6 @@ export default function DashboardPage() {
             ) : (
               <SimulationView
                 session={session}
-                camera={camera}
-                onCameraChange={setCamera}
                 xai={xai}
                 onXaiChange={setXai}
                 fullscreen={fullscreen}
