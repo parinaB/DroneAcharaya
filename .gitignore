@@ -47,8 +47,12 @@ __pycache__/
 *.so
 
 # Local SQLite dev DB (backend/app/core/config.py's database_url default) --
-# never the real Supabase Postgres, just a throwaway local file.
+# never the real Supabase Postgres, just a throwaway local file. Also
+# appears at the repo root (not just backend/) when pytest is invoked from
+# there (e.g. CI, see .github/workflows/ci-tests.yml) rather than backend/ --
+# database_url is CWD-relative same as data_dir/artifacts_dir.
 backend/dev.db
+/dev.db
 
 # Packaging / distribution
 build/
