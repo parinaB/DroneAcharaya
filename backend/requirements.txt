@@ -11,7 +11,7 @@ pandas
 # a version drift here is a silent-wrong-predictions risk, not just a
 # deprecation warning, since sklearn's pickle format isn't guaranteed
 # stable across versions.
-scikit-learn==1.6.1
+scikit-learn==1.9.0
 xgboost
 # CPU-only build -- the backend only ever runs inference (forward passes on
 # tiny per-frame/per-window inputs, never training), so the default PyPI
